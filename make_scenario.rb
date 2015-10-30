@@ -4,7 +4,8 @@ if ARGV.size != 2
 	exit
 end
 configFileName = ARGV[0]
-scenarioDir = ARGV[1]
+scenarioDirInput = ARGV[1]
+scenarioDirName = File.expand_path(scenarioDirInput)
 
 configFileExt = /^.*\.up\.config$/
 if not configFileExt.match configFileName
@@ -25,9 +26,9 @@ end
 
 # Make directory
 begin
-	Dir.mkdir scenarioDir if not File.directory? scenarioDir
+	Dir.mkdir scenarioDirName if not File.directory? scenarioDirName
 rescue
-	STDERR.puts "Cannot create scenario directory: " + scenarioDir
+	STDERR.puts "Cannot create scenario directory: " + scenarioDirName
 	puts
 	exit
 end
@@ -35,15 +36,15 @@ end
 # Check directory, should be empty
 scenarioDirContents = nil
 begin
-	scenarioDirContents = Dir.entries scenarioDir
+	scenarioDirContents = Dir.entries scenarioDirName
 rescue
-	STDERR.puts "Cannot access scenario directory: " + scenarioDir
+	STDERR.puts "Cannot access scenario directory: " + scenarioDirName
 	puts
 	exit
 end
 scenarioDirContents.delete_if {|filename| filename == "." or filename == ".."}
 if scenarioDirContents.size > 0
-	STDERR.puts "Found a dirty scenario directory: " + scenarioDir
+	STDERR.puts "Found a dirty scenario directory: " + scenarioDirName
 	puts
 	exit
 end
