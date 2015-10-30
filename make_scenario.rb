@@ -3,9 +3,8 @@ if ARGV.size != 2
 	puts
 	exit
 end
-configFileName = ARGV[0]
-scenarioDirInput = ARGV[1]
-scenarioDirName = File.expand_path(scenarioDirInput)
+configFileName = File.expand_path(ARGV[0])
+scenarioDirName = File.expand_path(ARGV[1])
 
 configFileExt = /^.*\.up\.config$/
 if not configFileExt.match configFileName
@@ -26,7 +25,10 @@ end
 
 # Make directory
 begin
-	Dir.mkdir scenarioDirName if not File.directory? scenarioDirName
+	if not File.directory? scenarioDirName
+		Dir.mkdir scenarioDirName
+		puts "Made directory: " + scenarioDirName
+	end
 rescue
 	STDERR.puts "Cannot create scenario directory: " + scenarioDirName
 	puts
@@ -218,4 +220,6 @@ end
 puts "Found #{numErrors} error(s)"
 puts
 
+puts "Writing scenario files to directory: " + scenarioDirName
 # TODO: Generate scenario files
+puts
