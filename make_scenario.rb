@@ -12,18 +12,49 @@ MY_NAME = "make_scenario.rb"
 SCENARIO_NAME = "up"
 
 TERRAIN_MARGIN = 100
-TERRAIN_WIDTH = 1000
-TERRAIN_LENGTH_MINIMUM = 500
+TERRAIN_WIDTH = 800
+TERRAIN_LENGTH_MINIMUM = 800
 
-IP_WIRELESS_SUBNET_SIMU_NET = "190.46.1.%d"
-IP_WIRELESS_SUBNET_MDC_NET = "190.47.1.%d"
-IP_WIRED_SUBNET = "190.48.0.%d"
-IP_LINK = "190.40.%d.%d"
+NODE_NUMBER_ZERO = 100
+NODES_PER_NETWORK_MAXIMUM = 240
 
-NETWORK_NODES_MAXIMUM = 240
-MDC_HOST_ID = 251
-ROUTER_HOST_ID = 254
-SERVER_HOST_ID = 253
+PLACEMENT_X_WIRELESS_SUBNET_SIMU_NET = 200
+PLACEMENT_X_WIRELESS_SUBNET_MDC_NET = 400
+PLACEMENT_X_WIRED_SUBNET = 800
+PLACEMENT_X_SWITCH = 600
+PLACEMENT_X_ROUTER = (PLACEMENT_X_SWITCH + PLACEMENT_X_WIRED_SUBNET) / 2
+PLACEMENT_X_SERVER = 800
+
+PLACEMENT_Y_PATH = 0
+PLACEMENT_Y_SUBNET = 400
+PLACEMENT_Y_ROUTER = 600
+PLACEMENT_Y_SERVER = 800
+
+SSID_WIRELESS_SUBNET_SIMU_NET = "SimuNet"
+SSID_WIRELESS_SUBNET_MDC_NET = "MDCNet"
+
+MAC_ADDRESS_PREFIX = "51:80:00:46"
+MAC_ADDRESS_OFFSET = 1
+
+IP_WIRELESS_SUBNET_SIMU_NET = "190.46.%d.%d"
+IP_WIRELESS_SUBNET_MDC_NET = "190.47.%d.%d"
+IP_WIRED_SUBNET = "190.48.%d.%d"
+IP_LINKS_SWITCH = "190.49.%d.%d"
+IP_SUBNET_MASK_LENGTH = 16
+MASK = IP_SUBNET_MASK_LENGTH
+
+IP_HOST_ID_NETWORK = [0, 0]
+IP_HOST_ID_MDC = [251, 251]
+IP_HOST_ID_ROUTER = [251, 254]
+IP_HOST_ID_SERVER = [251, 253]
+
+IP_HOST_ID_BYTE_3_BEGIN = 11
+IP_HOST_ID_BYTE_3_END = 210
+IP_HOST_ID_BYTE_2_BEGIN = 11
+IP_HOST_ID_BYTE_2_END = 110
+IP_HOST_ID_BYTE_2_OFFSET = 100
+
+PROPOGATION_DELAY_SERVER_ROUTER = 10
 
 configFileExt = /^.*\.up\.config$/
 if not configFileExt.match configFileName
@@ -162,8 +193,8 @@ def parseLineDS(line)
 	return nil if not arrDS[0].integer?
 	position = Integer(arrDS[0])
 	return nil if position < 0
-	return nil if not arrDS[1].numeric?
-	chunk = Float(arrDS[1])
+	return nil if not arrDS[1].integer?
+	chunk = Integer(arrDS[1])
 	return nil if chunk <= 0
 	return nil if not arrDS[2].integer?
 	deadline = Integer(arrDS[2])
@@ -222,7 +253,7 @@ end
 if listAP.size < 1
 	STDERR.puts "No access point"
 	numErrors += 1
-elsif listAP.size > NETWORK_NODES_MAXIMUM
+elsif listAP.size > NODES_PER_NETWORK_MAXIMUM
 	STDERR.puts "Too many access points"
 	numErrors += 1
 else puts "Parsed #{listAP.size} access point(s)"
@@ -230,7 +261,7 @@ end
 if listDS.size < 1
 	STDERR.puts "No data site"
 	numErrors += 1
-elsif listDS.size > NETWORK_NODES_MAXIMUM
+elsif listDS.size > NODES_PER_NETWORK_MAXIMUM
 	STDERR.puts "Too many data sites"
 	numErrors += 1
 else puts "Parsed #{listDS.size} data site(s)"
@@ -261,42 +292,70 @@ ROLE_MDC = 1
 ROLE_AP = 2
 ROLE_DS = 3
 ROLE_ROUTER = 4
-ROLE_SERVER = 5
+ROLE_SWITCH = 5
+ROLE_SERVER = 6
 ROLES_STR = { \
 	ROLE_MDC => "Mobile data collector", \
 	ROLE_AP => "Access point", \
 	ROLE_DS => "Data site", \
 	ROLE_ROUTER => "Router", \
+	ROLE_SWITCH => "Switch", \
 	ROLE_SERVER => "Cloud server"
 }
+ROLES_HOSTNAME_STR = { \
+	ROLE_MDC => "mdc%d", \
+	ROLE_AP => "ap%d", \
+	ROLE_DS => "data%d", \
+	ROLE_SWITCH => "switch%d", \
+	ROLE_ROUTER => "router%d", \
+	ROLE_SERVER => "server%d"
+}
 
-nodeNum = 0
+nodeNum = NODE_NUMBER_ZERO
 nodes = []
 
 nodeNum += 1
-itemRouter = []
-itemRouter << nodeNum
-itemRouter << ROUTER_HOST_ID
-nodes << [nodeNum, ROLE_ROUTER, nil]
-nodeNum += 1
 itemServer = []
 itemServer << nodeNum
-itemServer << SERVER_HOST_ID
+itemServer << IP_HOST_ID_SERVER
 nodes << [nodeNum, ROLE_SERVER, nil]
 nodeNum += 1
+itemRouter = []
+itemRouter << nodeNum
+itemRouter << IP_HOST_ID_ROUTER
+nodes << [nodeNum, ROLE_ROUTER, nil]
+nodeNum += 1
+itemSwitch = []
+itemSwitch << nodeNum
+itemSwitch << nil
+nodes << [nodeNum, ROLE_SWITCH, nil]
+nodeNum += 1
 itemMDC << nodeNum
-itemMDC << MDC_HOST_ID
+itemMDC << IP_HOST_ID_MDC
 nodes << [nodeNum, ROLE_MDC, nil]
+
+def convertItemIndexToHostId(index, offset=false)
+	hostPerByte3 = IP_HOST_ID_BYTE_3_END - IP_HOST_ID_BYTE_3_BEGIN + 1
+	hostPerByte2 = IP_HOST_ID_BYTE_2_END - IP_HOST_ID_BYTE_2_BEGIN + 1
+	if index + 1 > hostPerByte3 * hostPerByte2
+		raise ArgumentError
+	end
+	byte2 = (index.div hostPerByte3) + IP_HOST_ID_BYTE_2_BEGIN
+	byte3 = index % hostPerByte3 + IP_HOST_ID_BYTE_3_BEGIN
+	byte2 += IP_HOST_ID_BYTE_2_OFFSET if offset
+	return [byte2, byte3]
+end
+
 for j in 0...listAP.size
 	nodeNum += 1
 	listAP[j] << nodeNum
-	listAP[j] << 4 + j
+	listAP[j] << convertItemIndexToHostId(j)
 	nodes << [nodeNum, ROLE_AP, j]
 end
 for j in 0...listDS.size
 	nodeNum += 1
 	listDS[j] << nodeNum
-	listDS[j] << 4 + j
+	listDS[j] << convertItemIndexToHostId(j)
 	nodes << [nodeNum, ROLE_DS, j]
 end
 
@@ -313,6 +372,8 @@ for j in 0...nodes.size
 	elsif nodes[j][1] == ROLE_ROUTER
 		print IP_WIRELESS_SUBNET_SIMU_NET % itemRouter[-1] + ", "
 		print IP_WIRED_SUBNET % itemRouter[-1]
+	elsif nodes[j][1] == ROLE_SWITCH
+		print "-"
 	elsif nodes[j][1] == ROLE_SERVER
 		print IP_WIRED_SUBNET % itemServer[-1]
 	end
@@ -324,12 +385,11 @@ puts "Writing scenario files to directory: " + scenarioDirName
 scenarioAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.app"
 scenarioConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.config"
 scenarioDisplayFileName = scenarioDirName + "/#{SCENARIO_NAME}.display"
+scenarioHardwareAddressFileName = scenarioDirName \
+	+ "/#{SCENARIO_NAME}.mac-address"
 scenarioNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.nodes"
 
-# TODO: Generate application specification
-puts "Writing to file: " + scenarioAppFileName
-
-# TODO: Generate scenario configuration
+# Generate scenario configuration
 puts "Writing to file: " + scenarioConfigFileName
 scenarioConfigFileObj = File.open(scenarioConfigFileName, "w")
 scenarioConfigFileObj.puts "# QualNet Configuration File"
@@ -360,7 +420,7 @@ scenarioConfigFileObj.puts "
 COORDINATE-SYSTEM CARTESIAN
 TERRAIN-DIMENSIONS (%d, %d)
 WEATHER-MOBILITY-INTERVAL 10S" \
-% [TERRAIN_WIDTH + 2 * TERRAIN_MARGIN, terrainLength + 2 * TERRAIN_MARGIN]
+% [terrainLength + 2 * TERRAIN_MARGIN, TERRAIN_WIDTH + 2 * TERRAIN_MARGIN]
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.puts "# Channel Properties"
 scenarioConfigFileObj.puts "
@@ -589,14 +649,356 @@ scenarioConfigFileObj.puts "# [Default Wireless Subnet]"
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.puts "# [Wireless Subnet] Access Points"
 scenarioConfigFileObj.puts "
-"
+SUBNET N#{MASK}-%s {%d thru %d, %d} %d %d 0" \
+	% [IP_WIRELESS_SUBNET_SIMU_NET % IP_HOST_ID_NETWORK, \
+		listAP[0][-2], listAP[-1][-2], itemMDC[-2], \
+		PLACEMENT_X_WIRELESS_SUBNET_SIMU_NET \
+			+ TERRAIN_MARGIN, PLACEMENT_Y_SUBNET + TERRAIN_MARGIN]
+scenarioConfigFileObj.puts "
+[ N#{MASK}-%s ] PHY-MODEL PHY802.11b
+[ N#{MASK}-%s ] PHY802.11-AUTO-RATE-FALLBACK NO
+[ N#{MASK}-%s ] PHY-RX-MODEL PHY802.11b
+[ N#{MASK}-%s ] DUMMY-ANTENNA-MODEL-CONFIG-FILE-SPECIFY NO
+[ N#{MASK}-%s ] ANTENNA-MODEL OMNIDIRECTIONAL
+[ N#{MASK}-%s ] ENERGY-MODEL-SPECIFICATION NONE
 
+[ N#{MASK}-%s ] MAC-PROTOCOL MACDOT11
+[ N#{MASK}-%s ] MAC-DOT11-ASSOCIATION DYNAMIC
+[ N#{MASK}-%s ] MAC-DOT11-SSID #{SSID_WIRELESS_SUBNET_SIMU_NET}
+[ N#{MASK}-%s ] MAC-DOT11-AP NO
+[ N#{MASK}-%s ] MAC-DOT11-SCAN-TYPE PASSIVE
+[ N#{MASK}-%s ] DUMMY-MAC-DOT11-STATION-HANDOVER-RSS-TRIGGER YES
+[ N#{MASK}-%s ] MAC-DOT11-STATION-HANDOVER-RSS-TRIGGER -87.0
+[ N#{MASK}-%s ] MAC-DOT11-STA-PS-MODE-ENABLED NO
+[ N#{MASK}-%s ] MAC-DOT11-DIRECTIONAL-ANTENNA-MODE NO
+[ N#{MASK}-%s ] LLC-ENABLED YES
 
+[ N#{MASK}-%s ] NETWORK-PROTOCOL IP
+
+[ N#{MASK}-%s ] ARP-ENABLED YES
+[ N#{MASK}-%s ] ARP-CACHE-EXPIRE-INTERVAL 20M" \
+	% ([IP_WIRELESS_SUBNET_SIMU_NET % IP_HOST_ID_NETWORK] * 19)
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.puts "# [Wireless Subnet] Mobile Data Collector"
+scenarioConfigFileObj.puts "
+SUBNET N#{MASK}-%s {%d thru %d, %d} %d %d 0" \
+	% [IP_WIRELESS_SUBNET_MDC_NET % IP_HOST_ID_NETWORK, \
+		listDS[0][-2], listDS[-1][-2], itemMDC[-2], \
+		PLACEMENT_X_WIRELESS_SUBNET_MDC_NET \
+			+ TERRAIN_MARGIN, PLACEMENT_Y_SUBNET + TERRAIN_MARGIN]
+scenarioConfigFileObj.puts "
+[ N#{MASK}-%s ] MAC-PROTOCOL MACDOT11
+[ N#{MASK}-%s ] MAC-DOT11-ASSOCIATION DYNAMIC
+[ N#{MASK}-%s ] MAC-DOT11-SSID #{SSID_WIRELESS_SUBNET_MDC_NET}
+[ N#{MASK}-%s ] MAC-DOT11-AP NO
+[ N#{MASK}-%s ] MAC-DOT11-SCAN-TYPE PASSIVE
+[ N#{MASK}-%s ] DUMMY-MAC-DOT11-STATION-HANDOVER-RSS-TRIGGER YES
+[ N#{MASK}-%s ] MAC-DOT11-STATION-HANDOVER-RSS-TRIGGER -83.0
+[ N#{MASK}-%s ] MAC-DOT11-STA-PS-MODE-ENABLED NO
+[ N#{MASK}-%s ] MAC-DOT11-DIRECTIONAL-ANTENNA-MODE NO
+[ N#{MASK}-%s ] LLC-ENABLED YES" \
+	% ([IP_WIRELESS_SUBNET_MDC_NET % IP_HOST_ID_NETWORK] * 10)
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.puts "# [Wired Subnet]"
+scenarioConfigFileObj.puts "
+SUBNET N#{MASK}-%s {%d, %d} %d %d 0" \
+	% [IP_WIRED_SUBNET % IP_HOST_ID_NETWORK, \
+		itemRouter[-2], itemServer[-2],
+		PLACEMENT_X_WIRED_SUBNET \
+			+ TERRAIN_MARGIN, PLACEMENT_Y_SUBNET + TERRAIN_MARGIN]
+scenarioConfigFileObj.puts "
+[ N#{MASK}-%s ] MAC-PROTOCOL MAC802.3
+[ N#{MASK}-%s ] SUBNET-DATA-RATE 100000000
+[ N#{MASK}-%s ] MAC802.3-MODE HALF-DUPLEX
+[ N#{MASK}-%s ] SUBNET-PROPAGATION-DELAY 2.5US
+[ N#{MASK}-%s ] LLC-ENABLED YES
+[ N#{MASK}-%s ] NETWORK-PROTOCOL IP
+[ N#{MASK}-%s ] DUMMY-FIXED-COMMS YES
+
+[ N#{MASK}-%s ] ARP-ENABLED YES
+[ N#{MASK}-%s ] ARP-CACHE-EXPIRE-INTERVAL 20M" \
+	% ([IP_WIRED_SUBNET % IP_HOST_ID_NETWORK] * 9)
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.puts "# Node Configuration"
+scenarioConfigFileObj.puts
+for j in 0...nodes.size
+	node = nodes[j]
+	scenarioConfigFileObj.puts "[%d] HOSTNAME %s" \
+		% [node[0], ROLES_HOSTNAME_STR[node[1]] % node[0]]
+end
+scenarioConfigFileObj.puts "
+[%d] NODE-PLACEMENT FILE
+[%d] NODE-PLACEMENT FILE
+[%d] NODE-PLACEMENT FILE
+[%d] NODE-PLACEMENT FILE
+[%d thru %d] NODE-PLACEMENT FILE
+[%d thru %d] NODE-PLACEMENT FILE
+
+NODE-POSITION-FILE #{SCENARIO_NAME}.nodes" \
+	% [itemServer[-2], itemRouter[-2], itemSwitch[-2], \
+		itemMDC[-2], \
+		listAP[0][-2], listAP[-1][-2], \
+		listDS[0][-2], listDS[-1][-2]]
+scenarioConfigFileObj.puts "
+[%d] MOBILITY-POSITION-GRANULARITY 1.0
+[%d] MOBILITY FILE" % ([itemMDC[-2]] * 2)
+scenarioConfigFileObj.puts "
+[%d thru %d] GUI-NODE-2D-ICON AccessPoint.png
+[%d] GUI-NODE-2D-ICON devices/web_cluster.png
+[%d] GUI-NODE-2D-ICON devices/router-color.png" \
+	% [listAP[0][-2], listAP[-1][-2], \
+		itemServer[-2], \
+		itemRouter[-2]]
+scenarioConfigFileObj.puts "
+[%d thru %d] ARP-ENABLED YES
+[%d thru %d] LLC-ENABLED YES" \
+	% ([nodes[0][0], nodes[-1][0]] * 2)
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.puts "# Hierarchy Configuration"
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.puts "# Interface Configuration"
+scenarioConfigFileObj.puts
+allAddresses = []
+setAddressesAP = []
+scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP
+[%d] IP-ADDRESS[0] %s # Server: Wired" \
+	% ([itemServer[-2]] * 2 + [IP_WIRED_SUBNET % itemServer[-1]])
+allAddresses << IP_WIRED_SUBNET % itemServer[-1]
+# scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP
+# [%d] IP-ADDRESS[0] %s # Router: Wireless #{SSID_WIRELESS_SUBNET_SIMU_NET}" \
+# % ([itemRouter[-2]] * 2 + [IP_WIRELESS_SUBNET_SIMU_NET % itemRouter[-1]])
+switchInterfaceNum = 0
+switchPortMap = []
+scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP
+[%d] IP-ADDRESS[0] %s # Router: Wired" \
+	% ([itemRouter[-2]] * 2 + [IP_WIRED_SUBNET % itemRouter[-1]])
+scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[1] IP
+[%d] IP-ADDRESS[1] %s # Router: Link" \
+	% ([itemRouter[-2]] * 2 + [IP_LINKS_SWITCH % itemRouter[-1]])
+switchPortAddress = IP_LINKS_SWITCH % [itemRouter[-1][0] + 2, itemRouter[-1][1]]
+allAddresses << IP_WIRED_SUBNET % itemRouter[-1]
+allAddresses << IP_LINKS_SWITCH % itemRouter[-1]
+allAddresses << switchPortAddress
+scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[%d] IP
+[%d] IP-ADDRESS[%d] %s" \
+	% [itemSwitch[-2], switchInterfaceNum, \
+		itemSwitch[-2], switchInterfaceNum, \
+		switchPortAddress]
+switchInterfaceNum += 1
+switchPortMap << [itemRouter[-2], IP_LINKS_SWITCH % itemRouter[-1], \
+	switchPortAddress]
+scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP
+[%d] IP-ADDRESS[0] %s # Mobile Data Collector: Wireless " \
+	% ([itemMDC[-2]] * 2 + [IP_WIRELESS_SUBNET_SIMU_NET % itemMDC[-1]]) \
+	+ "#{SSID_WIRELESS_SUBNET_SIMU_NET}"
+scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[1] IP
+[%d] IP-ADDRESS[1] %s # Mobile Data Collector: Wireless " \
+	% ([itemMDC[-2]] * 2 + [IP_WIRELESS_SUBNET_MDC_NET % itemMDC[-1]]) \
+	+ "#{SSID_WIRELESS_SUBNET_MDC_NET}"
+allAddresses << IP_WIRELESS_SUBNET_SIMU_NET % itemMDC[-1]
+allAddresses << IP_WIRELESS_SUBNET_MDC_NET % itemMDC[-1]
+setAddressesAP << IP_WIRELESS_SUBNET_MDC_NET % itemMDC[-1]
+scenarioConfigFileObj.puts
+for j in 0...listAP.size
+	itemAP = listAP[j]
+	scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP" % itemAP[-2]
+	scenarioConfigFileObj.puts "[%d] IP-ADDRESS[0] %s" \
+		% [itemAP[-2], IP_WIRELESS_SUBNET_SIMU_NET % itemAP[-1]]
+	scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[1] IP" % itemAP[-2]
+	scenarioConfigFileObj.puts "[%d] IP-ADDRESS[1] %s" \
+		% [itemAP[-2], IP_LINKS_SWITCH % itemAP[-1]]
+	scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[%d] IP" \
+		% [itemSwitch[-2], switchInterfaceNum]
+	switchPortAddress = IP_LINKS_SWITCH \
+		% convertItemIndexToHostId(j, offset=true)
+	setAddressesAP << IP_WIRELESS_SUBNET_SIMU_NET % itemAP[-1]
+	allAddresses << IP_WIRELESS_SUBNET_SIMU_NET % itemAP[-1]
+	allAddresses << IP_LINKS_SWITCH % itemAP[-1]
+	allAddresses << switchPortAddress
+	scenarioConfigFileObj.puts "[%d] IP-ADDRESS[%d] %s" \
+		% [itemSwitch[-2], switchInterfaceNum, \
+			switchPortAddress]
+	switchInterfaceNum += 1
+	switchPortMap << [itemAP[-2], IP_LINKS_SWITCH % itemAP[-1], \
+		switchPortAddress]
+end
+scenarioConfigFileObj.puts
+for j in 0...listDS.size
+	itemDS = listDS[j]
+	scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP" % itemDS[-2]
+	scenarioConfigFileObj.puts "[%d] IP-ADDRESS[0] %s" \
+		% [itemDS[-2], IP_WIRELESS_SUBNET_MDC_NET % itemDS[-1]]
+	allAddresses << IP_WIRELESS_SUBNET_MDC_NET % itemDS[-1]
+end
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.puts "# Node Configuration"
+scenarioConfigFileObj.puts "
+[%d] SWITCH YES" % itemSwitch[-2]
+for j in 0...switchPortMap.size
+	scenarioConfigFileObj.puts "[%d] SWITCH-PORT-MAP[%d] %s" \
+		% [itemSwitch[-2], j + 1, switchPortMap[j][2]]
+end
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.puts "# Links"
+# for j in 0...switchPortMap.size
+# 	switchPort = switchPortMap[j]
+# 	scenarioConfigFileObj.puts "
+# LINK N#{MASK}-%s { %d, %d }
+# [ %s %s ] LINK-MAC-PROTOCOL ABSTRACT
+# [ %s %s ] DUMMY-GUI-SYMMETRIC-LINK YES
+# [ %s %s ] NETWORK-PROTOCOL IP" \
+# 	% ([IP_LINKS_SWITCH % IP_HOST_ID_NETWORK, switchPort[0], itemSwitch[-2]] \
+# 		+ [switchPort[1], switchPort[2]] * 3)
+# end
+scenarioConfigFileObj.puts "
+LINK N#{MASK}-%s { %d, %d }
+[ %s %s ] LINK-MAC-PROTOCOL ABSTRACT
+[ %s %s ] DUMMY-GUI-SYMMETRIC-LINK YES
+[ %s %s ] NETWORK-PROTOCOL IP" \
+	% ([IP_LINKS_SWITCH % IP_HOST_ID_NETWORK, itemRouter[-2], itemSwitch[-2]] \
+		+ [IP_LINKS_SWITCH % itemRouter[-1], \
+			IP_LINKS_SWITCH % [itemRouter[-1][0] + 2, itemRouter[-1][1]]] * 3)
+for j in 0...listAP.size
+	itemAP = listAP[j]
+	scenarioConfigFileObj.puts "
+LINK N#{MASK}-%s { %d, %d }
+[ %s %s ] LINK-MAC-PROTOCOL ABSTRACT
+[ %s %s ] DUMMY-GUI-SYMMETRIC-LINK YES
+[ %s %s ] NETWORK-PROTOCOL IP
+[ %s %s ] LINK-BANDWIDTH %d" \
+	% ([IP_LINKS_SWITCH % IP_HOST_ID_NETWORK, itemAP[-2], itemSwitch[-2]] \
+		+ [IP_LINKS_SWITCH % itemAP[-1], \
+			IP_LINKS_SWITCH % convertItemIndexToHostId(j, offset=true)] * 4 \
+		+ [itemAP[1] * 1000])
+end
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.puts "# IP Configuration"
+scenarioConfigFileObj.puts "
+[%s] LINK-PROPAGATION-DELAY #{PROPOGATION_DELAY_SERVER_ROUTER}MS
+[%s] LINK-BANDWIDTH 10000000" \
+	% ([[IP_WIRED_SUBNET % itemServer[-1], \
+		IP_WIRED_SUBNET % itemRouter[-1]].join(" ")] * 2)
+scenarioConfigFileObj.puts "
+[%s] MAC-DOT11-AP-SUPPORT-PS-MODE NO
+[%s] MAC-DOT11-DTIM-PERIOD 3
+[%s] MAC-DOT11-SCAN-TYPE DISABLED
+[%s] MAC-DOT11-BEACON-INTERVAL 200
+[%s] MAC-DOT11-RELAY-FRAMES YES
+[%s] MAC-DOT11-AP YES
+[%s] MAC-DOT11-PC NO
+[%s] MAC-ADDRESS-CONFIG-FILE #{SCENARIO_NAME}.mac-address
+[%s] DUMMY-MAC-ADDRESS YES" % ([setAddressesAP.join(" ")] * 9)
+scenarioConfigFileObj.puts "
+[%s] IP-QUEUE-PRIORITY-QUEUE-SIZE[0] 150000
+[%s] IP-QUEUE-TYPE[0] FIFO
+[%s] IP-QUEUE-PRIORITY-QUEUE-SIZE[1] 150000
+[%s] IP-QUEUE-TYPE[1] FIFO
+[%s] IP-QUEUE-PRIORITY-QUEUE-SIZE[2] 150000
+[%s] IP-QUEUE-TYPE[2] FIFO" % ([allAddresses.join(" ")] * 6)
+scenarioConfigFileObj.puts
 scenarioConfigFileObj.close
 
-# TODO: Generate display configuration
-puts "Writing to file: " + scenarioDisplayFileName
-
-# TODO: Generate node placement configuration
+# Generate node placement configuration
 puts "Writing to file: " + scenarioNodesFileName
+scenarioNodesFileObj = File.open(scenarioNodesFileName, "w")
+nodeLineFormat = "%d 0 (%.4f, %.4f, %.4f) 0 0"
+scenarioNodesFileObj.puts nodeLineFormat \
+	% [itemSwitch[-2], \
+		TERRAIN_MARGIN + PLACEMENT_X_SWITCH, \
+		TERRAIN_MARGIN + PLACEMENT_Y_SUBNET, 0]
+scenarioNodesFileObj.puts nodeLineFormat \
+	% [itemRouter[-2], \
+		TERRAIN_MARGIN + PLACEMENT_X_ROUTER, \
+		TERRAIN_MARGIN + PLACEMENT_Y_ROUTER, 0]
+scenarioNodesFileObj.puts nodeLineFormat \
+	% [itemServer[-2], \
+		TERRAIN_MARGIN + PLACEMENT_X_SERVER, \
+		TERRAIN_MARGIN + PLACEMENT_Y_SERVER, 0]
+scenarioNodesFileObj.puts nodeLineFormat \
+	% [itemMDC[-2], \
+		TERRAIN_MARGIN + 0, \
+		TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+for j in 0...listAP.size
+	itemAP = listAP[j]
+	scenarioNodesFileObj.puts nodeLineFormat \
+		% [itemAP[-2], \
+			TERRAIN_MARGIN + itemAP[0], \
+			TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+end
+for j in 0...listDS.size
+	itemDS = listDS[j]
+	scenarioNodesFileObj.puts nodeLineFormat \
+		% [itemDS[-2], \
+			TERRAIN_MARGIN + itemDS[0], \
+			TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+end
+scenarioNodesFileObj.puts
+scenarioNodesFileObj.close
+
+# Generate application specification
+puts "Writing to file: " + scenarioAppFileName
+scenarioAppFileObj = File.open(scenarioAppFileName, "w")
+scenarioAppFileObj.puts "UP CLOUD #{itemServer[-2]}"
+scenarioAppFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]}"
+for j in 0...listDS.size
+	itemDS = listDS[j]
+	scenarioAppFileObj.puts "UP DATA %d %d %d %d %d %.4f" \
+		% [itemDS[-2], itemMDC[-2], \
+			j + 1, \
+			itemDS[1], itemDS[2], itemDS[3]]
+end
+scenarioAppFileObj.puts
+scenarioAppFileObj.close
+
+def convertItemIndexToHardwareAddress(index)
+	raise ArgumentError if index + MAC_ADDRESS_OFFSET + 1 > 256 * 256
+	byte4 = (index + MAC_ADDRESS_OFFSET).div 256
+	byte5 = (index + MAC_ADDRESS_OFFSET) % 256
+	return "#{MAC_ADDRESS_PREFIX}:%02x:%02x" % [byte4, byte5]
+end
+
+# Generate MAC address specification
+puts "Writing to file: " + scenarioHardwareAddressFileName
+scenarioHardwareAddressFileObj = File.open(scenarioHardwareAddressFileName, "w")
+for j in 0...listAP.size
+	itemAP = listAP[j]
+	scenarioHardwareAddressFileObj.puts "%d %d ETHERNET %s" \
+		% [itemAP[-2], 0, convertItemIndexToHardwareAddress(j)]
+end
+scenarioHardwareAddressFileObj.puts
+scenarioHardwareAddressFileObj.close
+
+# Generate display configuration
+puts "Writing to file: " + scenarioDisplayFileName
+scenarioDisplayFileObj = File.open(scenarioDisplayFileName, "w")
+scenarioDisplayFileObj.puts "[General]"
+scenarioDisplayFileObj.puts "
+showAnimation=false
+showLegend=true
+showNodeIds=true
+showHierarchyDisplay=true
+showIpAddresses=false
+showWiredLinks=true
+showAppLinks=true
+showGrid=true
+showBgImages=true
+showWeather=true
+showHierarchyNames=false
+showPatterns=false
+showNightView=false
+showHostNames=false
+showInterfaceNames=false
+showWirelessSubnets=true
+showSatelliteLinks=true
+showRuler=true
+showWaypoint=true
+showAnnotations=true
+showAsIds=false
+showQueues=false
+showAxes=false
+nodeOrientationIcon=true
+nodeOrientationArrow=false"
+scenarioDisplayFileObj.puts
+scenarioDisplayFileObj.close
+
 puts
