@@ -1,12 +1,21 @@
 # Author: Charles ZHU
 #
+require "fileutils"
+
 if ARGV.size != 2
-	STDERR.puts "Usage: ruby make_scenario.rb CONFIG.up.config DIRECTORY"
+	STDERR.puts "Usage: ruby make_scenario.rb CONFIG.up.deployment DIRECTORY"
 	puts
 	exit
 end
 configFileName = File.expand_path(ARGV[0])
 scenarioDirName = File.expand_path(ARGV[1])
+
+configFileExt = /^.*\.up\.deployment$/
+if not configFileExt.match configFileName
+	STDERR.puts "Invalid configuration file extension"
+	puts
+	exit
+end
 
 MY_NAME = "make_scenario.rb"
 SCENARIO_NAME = "up"
@@ -14,6 +23,9 @@ SCENARIO_NAME = "up"
 TERRAIN_MARGIN = 100
 TERRAIN_WIDTH = 800
 TERRAIN_LENGTH_MINIMUM = 800
+
+MDC_WAIT_BEFORE_START = 30
+SIMULATION_WAIT_AFTER_END = 90
 
 NODE_NUMBER_ZERO = 100
 NODES_PER_NETWORK_MAXIMUM = 240
@@ -29,6 +41,8 @@ PLACEMENT_Y_PATH = 0
 PLACEMENT_Y_SUBNET = 400
 PLACEMENT_Y_ROUTER = 600
 PLACEMENT_Y_SERVER = 800
+
+TX_POWER_AP = -10.0
 
 SSID_WIRELESS_SUBNET_SIMU_NET = "SimuNet"
 SSID_WIRELESS_SUBNET_MDC_NET = "MDCNet"
@@ -55,13 +69,6 @@ IP_HOST_ID_BYTE_2_END = 110
 IP_HOST_ID_BYTE_2_OFFSET = 100
 
 PROPOGATION_DELAY_SERVER_ROUTER = 10
-
-configFileExt = /^.*\.up\.config$/
-if not configFileExt.match configFileName
-	STDERR.puts "Invalid configuration file extension"
-	puts
-	exit
-end
 
 # Open configuration file
 text = nil
@@ -168,11 +175,14 @@ end
 
 def parseLineMDC(line)
 	arrMDC = line.split
-	return nil if arrMDC.size != 1
+	return nil if arrMDC.size != 2
 	return nil if not arrMDC[0].integer?
 	speed = Integer(arrMDC[0])
 	return nil if speed <= 0
-	return [speed]
+	return nil if not arrMDC[1].numeric?
+	bandwidth = Float(arrMDC[1])
+	return nil if bandwidth <= 0
+	return [speed, bandwidth]
 end
 
 def parseLineAP(line)
@@ -382,12 +392,17 @@ end
 puts
 
 puts "Writing scenario files to directory: " + scenarioDirName
+deploymentFileName = scenarioDirName + "/#{SCENARIO_NAME}.deployment"
 scenarioAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.app"
-scenarioConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.config"
+scenarioConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}_part.config"
 scenarioDisplayFileName = scenarioDirName + "/#{SCENARIO_NAME}.display"
 scenarioHardwareAddressFileName = scenarioDirName \
 	+ "/#{SCENARIO_NAME}.mac-address"
-scenarioNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.nodes"
+scenarioNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}_part.nodes"
+scenarioTestScriptName = scenarioDirName + "/test.sh"
+scenarioTestAppFileName = scenarioDirName + "/#{SCENARIO_NAME}_test.app"
+scenarioTestConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}_test.config"
+scenarioTestNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}_test.nodes"
 
 # Generate scenario configuration
 puts "Writing to file: " + scenarioConfigFileName
@@ -401,7 +416,6 @@ scenarioConfigFileObj.puts "
 VERSION 12.10
 EXPERIMENT-NAME up
 EXPERIMENT-COMMENT NONE
-SIMULATION-TIME 60S
 SEED 1
 MULTI-GUI-INTERFACE NO
 GUI-CONFIG-LOCKED NO"
@@ -642,8 +656,7 @@ IP-QUEUE-TYPE FIFO"
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.puts "# Miscellaneous Settings"
 scenarioConfigFileObj.puts "
-GUI-DISPLAY-SETTINGS-FILE #{SCENARIO_NAME}.display
-APP-CONFIG-FILE #{SCENARIO_NAME}.app"
+GUI-DISPLAY-SETTINGS-FILE #{SCENARIO_NAME}.display"
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.puts "# [Default Wireless Subnet]"
 scenarioConfigFileObj.puts
@@ -686,6 +699,12 @@ SUBNET N#{MASK}-%s {%d thru %d, %d} %d %d 0" \
 		listDS[0][-2], listDS[-1][-2], itemMDC[-2], \
 		PLACEMENT_X_WIRELESS_SUBNET_MDC_NET \
 			+ TERRAIN_MARGIN, PLACEMENT_Y_SUBNET + TERRAIN_MARGIN]
+scenarioConfigFileObj.puts "
+[ N#{MASK}-%s ] PHY-MODEL PHY802.11b
+[ N#{MASK}-%s ] PHY802.11-AUTO-RATE-FALLBACK NO
+[ N#{MASK}-%s ] PHY802.11-DATA-RATE #{(itemMDC[1] * 1000).round}
+[ N#{MASK}-%s ] PHY-RX-MODEL PHY802.11b" \
+	% ([IP_WIRELESS_SUBNET_MDC_NET % IP_HOST_ID_NETWORK] * 4)
 scenarioConfigFileObj.puts "
 [ N#{MASK}-%s ] MAC-PROTOCOL MACDOT11
 [ N#{MASK}-%s ] MAC-DOT11-ASSOCIATION DYNAMIC
@@ -732,9 +751,7 @@ scenarioConfigFileObj.puts "
 [%d] NODE-PLACEMENT FILE
 [%d] NODE-PLACEMENT FILE
 [%d thru %d] NODE-PLACEMENT FILE
-[%d thru %d] NODE-PLACEMENT FILE
-
-NODE-POSITION-FILE #{SCENARIO_NAME}.nodes" \
+[%d thru %d] NODE-PLACEMENT FILE" \
 	% [itemServer[-2], itemRouter[-2], itemSwitch[-2], \
 		itemMDC[-2], \
 		listAP[0][-2], listAP[-1][-2], \
@@ -864,12 +881,14 @@ for j in 0...listAP.size
 LINK N#{MASK}-%s { %d, %d }
 [ %s %s ] LINK-MAC-PROTOCOL ABSTRACT
 [ %s %s ] DUMMY-GUI-SYMMETRIC-LINK YES
-[ %s %s ] NETWORK-PROTOCOL IP
-[ %s %s ] LINK-BANDWIDTH %d" \
+[ %s %s ] NETWORK-PROTOCOL IP" \
 	% ([IP_LINKS_SWITCH % IP_HOST_ID_NETWORK, itemAP[-2], itemSwitch[-2]] \
 		+ [IP_LINKS_SWITCH % itemAP[-1], \
-			IP_LINKS_SWITCH % convertItemIndexToHostId(j, offset=true)] * 4 \
-		+ [itemAP[1] * 1000])
+			IP_LINKS_SWITCH % convertItemIndexToHostId(j, offset=true)] * 3)
+	scenarioConfigFileObj.puts "[ %s %s ] LINK-BANDWIDTH %d" \
+		% [IP_LINKS_SWITCH % itemAP[-1], \
+			IP_LINKS_SWITCH % convertItemIndexToHostId(j, offset=true), \
+			itemAP[1] * 1000]
 end
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.puts "# IP Configuration"
@@ -878,7 +897,21 @@ scenarioConfigFileObj.puts "
 [%s] LINK-BANDWIDTH 10000000" \
 	% ([[IP_WIRED_SUBNET % itemServer[-1], \
 		IP_WIRED_SUBNET % itemRouter[-1]].join(" ")] * 2)
+# scenarioConfigFileObj.puts
+# for j in 0...listAP.size
+# 	itemAP = listAP[j]
+# 	scenarioConfigFileObj.puts "[%s] PHY-MODEL PHY802.11b" \
+# 		% (IP_WIRELESS_SUBNET_SIMU_NET % itemAP[-1])
+# 	scenarioConfigFileObj.puts "[%s] PHY802.11-AUTO-RATE-FALLBACK NO" \
+# 		% (IP_WIRELESS_SUBNET_SIMU_NET % itemAP[-1])
+# 	scenarioConfigFileObj.puts "[%s] PHY802.11-DATA-RATE %d" \
+# 		% [IP_WIRELESS_SUBNET_SIMU_NET % itemAP[-1], (itemAP[1] * 1000).round]
+# end
 scenarioConfigFileObj.puts "
+[%s] PHY802.11b-TX-POWER--1MBPS #{TX_POWER_AP}
+[%s] PHY802.11b-TX-POWER--2MBPS #{TX_POWER_AP}
+[%s] PHY802.11b-TX-POWER--6MBPS #{TX_POWER_AP}
+[%s] PHY802.11b-TX-POWER-11MBPS #{TX_POWER_AP}
 [%s] MAC-DOT11-AP-SUPPORT-PS-MODE NO
 [%s] MAC-DOT11-DTIM-PERIOD 3
 [%s] MAC-DOT11-SCAN-TYPE DISABLED
@@ -887,7 +920,7 @@ scenarioConfigFileObj.puts "
 [%s] MAC-DOT11-AP YES
 [%s] MAC-DOT11-PC NO
 [%s] MAC-ADDRESS-CONFIG-FILE #{SCENARIO_NAME}.mac-address
-[%s] DUMMY-MAC-ADDRESS YES" % ([setAddressesAP.join(" ")] * 9)
+[%s] DUMMY-MAC-ADDRESS YES" % ([setAddressesAP.join(" ")] * 13)
 scenarioConfigFileObj.puts "
 [%s] IP-QUEUE-PRIORITY-QUEUE-SIZE[0] 150000
 [%s] IP-QUEUE-TYPE[0] FIFO
@@ -898,10 +931,32 @@ scenarioConfigFileObj.puts "
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.close
 
+puts "Copying to file: " + scenarioTestConfigFileName
+FileUtils.cp(scenarioConfigFileName, scenarioTestConfigFileName)
+
+puts "Writing to file: " + scenarioTestConfigFileName
+scenarioTestConfigFileObj = File.open(scenarioTestConfigFileName, "a")
+scenarioTestConfigFileObj.puts "# Test Configuration"
+scenarioTestConfigFileObj.puts "
+APP-CONFIG-FILE #{SCENARIO_NAME}_test.app
+NODE-POSITION-FILE #{SCENARIO_NAME}_test.nodes"
+scenarioTestConfigFileObj.puts
+scenarioTestConfigFileObj.close
+
+puts "Writing to file: " + scenarioConfigFileName
+scenarioConfigFileObj = File.open(scenarioConfigFileName, "a")
+scenarioConfigFileObj.puts "# Case Configuration"
+scenarioConfigFileObj.puts "
+APP-CONFIG-FILE #{SCENARIO_NAME}.app
+NODE-POSITION-FILE #{SCENARIO_NAME}.nodes"
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.close
+
 # Generate node placement configuration
 puts "Writing to file: " + scenarioNodesFileName
 scenarioNodesFileObj = File.open(scenarioNodesFileName, "w")
 nodeLineFormat = "%d 0 (%.4f, %.4f, %.4f) 0 0"
+nodeLineFormatDelayed = "%d #{MDC_WAIT_BEFORE_START}S (%.4f, %.4f, %.4f) 0 0"
 scenarioNodesFileObj.puts nodeLineFormat \
 	% [itemSwitch[-2], \
 		TERRAIN_MARGIN + PLACEMENT_X_SWITCH, \
@@ -915,6 +970,10 @@ scenarioNodesFileObj.puts nodeLineFormat \
 		TERRAIN_MARGIN + PLACEMENT_X_SERVER, \
 		TERRAIN_MARGIN + PLACEMENT_Y_SERVER, 0]
 scenarioNodesFileObj.puts nodeLineFormat \
+	% [itemMDC[-2], \
+		TERRAIN_MARGIN + 0, \
+		TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+scenarioNodesFileObj.puts nodeLineFormatDelayed \
 	% [itemMDC[-2], \
 		TERRAIN_MARGIN + 0, \
 		TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
@@ -935,18 +994,75 @@ end
 scenarioNodesFileObj.puts
 scenarioNodesFileObj.close
 
+puts "Copying to file: " + scenarioTestNodesFileName
+FileUtils.cp(scenarioNodesFileName, scenarioTestNodesFileName)
+
+TIME_SITES_TEST = { \
+	ROLE_AP => 60, \
+	ROLE_DS => 20 \
+}
+
+puts "Writing to file: " + scenarioTestNodesFileName
+scenarioNodesConfigFileObj = File.open(scenarioTestNodesFileName, "a")
+xNode = 0
+tNode = MDC_WAIT_BEFORE_START
+listSites = []
+for itemAP in listAP
+	listSites << [itemAP[0], ROLE_AP]
+end
+for itemDS in listDS
+	listSites << [itemDS[0], ROLE_DS]
+end
+listSites.sort! {|x, y| x[0] <=> y[0]}
+nodeLineFormat = "#{itemMDC[-2]} %dS (%.4f, %.4f, %.4f) 0 0"
+for itemSite in listSites
+	tNode += (1.0 * (itemSite[0] - xNode) / itemMDC[0]).round
+	xNode = itemSite[0]
+	scenarioNodesConfigFileObj.puts nodeLineFormat \
+		% [tNode, TERRAIN_MARGIN + xNode, TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+	tNode += TIME_SITES_TEST[itemSite[1]]
+	scenarioNodesConfigFileObj.puts nodeLineFormat \
+		% [tNode, TERRAIN_MARGIN + xNode, TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+	scenarioNodesConfigFileObj
+end
+tNode += SIMULATION_WAIT_AFTER_END
+scenarioNodesConfigFileObj.puts
+scenarioNodesConfigFileObj.close
+
+puts "Writing to file: " + scenarioTestConfigFileName
+scenarioTestConfigFileObj = File.open(scenarioTestConfigFileName, "a")
+scenarioTestConfigFileObj.puts "# Test Configuration"
+scenarioTestConfigFileObj.puts "
+SIMULATION-TIME #{tNode}S"
+scenarioTestConfigFileObj.puts
+scenarioTestConfigFileObj.close
+
 # Generate application specification
 puts "Writing to file: " + scenarioAppFileName
 scenarioAppFileObj = File.open(scenarioAppFileName, "w")
 scenarioAppFileObj.puts "UP CLOUD #{itemServer[-2]}"
-scenarioAppFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]}"
 for j in 0...listDS.size
 	itemDS = listDS[j]
 	scenarioAppFileObj.puts "UP DATA %d %d %d %d %d %.4f" \
 		% [itemDS[-2], itemMDC[-2], \
 			j + 1, \
-			itemDS[1], itemDS[2], itemDS[3]]
+			itemDS[1], itemDS[2] + MDC_WAIT_BEFORE_START, itemDS[3]]
 end
+scenarioAppFileObj.puts
+scenarioAppFileObj.close
+
+puts "Copying to file: " + scenarioTestAppFileName
+FileUtils.cp(scenarioAppFileName, scenarioTestAppFileName)
+
+puts "Writing to file: " + scenarioTestAppFileName
+scenarioAppConfigFileObj = File.open(scenarioTestAppFileName, "a")
+scenarioAppConfigFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]}"
+scenarioAppConfigFileObj.puts
+scenarioAppConfigFileObj.close
+
+puts "Writing to file: " + scenarioAppFileName
+scenarioAppFileObj = File.open(scenarioAppFileName, "a")
+scenarioAppFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]}"
 scenarioAppFileObj.puts
 scenarioAppFileObj.close
 
@@ -1001,4 +1117,18 @@ nodeOrientationArrow=false"
 scenarioDisplayFileObj.puts
 scenarioDisplayFileObj.close
 
+# Generate test script
+puts "Writing to file: " + scenarioTestScriptName
+scenarioTestScriptObj = File.open(scenarioTestScriptName, "w")
+scenarioTestScriptObj.puts \
+	"$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}_test.config"
+scenarioTestScriptObj.puts
+scenarioTestScriptObj.close
+FileUtils.chmod "u+x", scenarioTestScriptName
+
+# Copy configuration file
+puts "Copying to file: " + deploymentFileName
+FileUtils.cp configFileName, deploymentFileName
+
+#
 puts
