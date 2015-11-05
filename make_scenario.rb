@@ -1062,10 +1062,12 @@ end
 listSites.sort! {|x, y| x[0] <=> y[0]}
 nodeLineFormat = "#{itemMDC[-2]} %dS (%.4f, %.4f, %.4f) 0 0"
 for itemSite in listSites
-	tNode += (1.0 * (itemSite[0] - xNode) / itemMDC[0]).round
-	xNode = itemSite[0]
-	scenarioNodesConfigFileObj.puts nodeLineFormat \
-		% [tNode, TERRAIN_MARGIN + xNode, TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+	if xNode < itemSite[0]
+		tNode += (1.0 * (itemSite[0] - xNode) / itemMDC[0]).round
+		xNode = itemSite[0]
+		scenarioNodesConfigFileObj.puts nodeLineFormat \
+			% [tNode, TERRAIN_MARGIN + xNode, TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+	end
 	tNode += TIME_SITES_TEST[itemSite[1]]
 	scenarioNodesConfigFileObj.puts nodeLineFormat \
 		% [tNode, TERRAIN_MARGIN + xNode, TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
