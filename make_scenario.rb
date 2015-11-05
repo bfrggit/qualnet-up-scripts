@@ -43,6 +43,8 @@ PLACEMENT_Y_ROUTER = 600
 PLACEMENT_Y_SERVER = 800
 
 TX_POWER_AP = -10.0
+TX_POWER_DS = -20.0
+TX_POWER_MDC = -20.0
 
 SSID_WIRELESS_SUBNET_SIMU_NET = "SimuNet"
 SSID_WIRELESS_SUBNET_MDC_NET = "MDCNet"
@@ -394,15 +396,15 @@ puts
 puts "Writing scenario files to directory: " + scenarioDirName
 deploymentFileName = scenarioDirName + "/#{SCENARIO_NAME}.deployment"
 scenarioAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.app"
-scenarioConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}_part.config"
+scenarioConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.part.config"
 scenarioDisplayFileName = scenarioDirName + "/#{SCENARIO_NAME}.display"
 scenarioHardwareAddressFileName = scenarioDirName \
 	+ "/#{SCENARIO_NAME}.mac-address"
-scenarioNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}_part.nodes"
+scenarioNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.part.nodes"
 scenarioTestScriptName = scenarioDirName + "/test.sh"
-scenarioTestAppFileName = scenarioDirName + "/#{SCENARIO_NAME}_test.app"
-scenarioTestConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}_test.config"
-scenarioTestNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}_test.nodes"
+scenarioTestAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.app"
+scenarioTestConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.config"
+scenarioTestNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.nodes"
 
 # Generate scenario configuration
 puts "Writing to file: " + scenarioConfigFileName
@@ -517,19 +519,26 @@ scenarioConfigFileObj.puts "# Physical Layer"
 scenarioConfigFileObj.puts "
 PHY-LISTENABLE-CHANNELS channel0
 PHY-LISTENING-CHANNELS channel0
-PHY-MODEL PHY802.11b
+PHY-MODEL PHY802.11a
 PHY802.11-AUTO-RATE-FALLBACK NO
-PHY802.11-DATA-RATE 2000000
-PHY802.11b-TX-POWER--1MBPS 15.0
-PHY802.11b-TX-POWER--2MBPS 15.0
-PHY802.11b-TX-POWER--6MBPS 15.0
-PHY802.11b-TX-POWER-11MBPS 15.0
-PHY802.11b-RX-SENSITIVITY--1MBPS -94.0
-PHY802.11b-RX-SENSITIVITY--2MBPS -91.0
-PHY802.11b-RX-SENSITIVITY--6MBPS -87.0
-PHY802.11b-RX-SENSITIVITY-11MBPS -83.0
-PHY802.11-ESTIMATED-DIRECTIONAL-ANTENNA-GAIN 15.0
-PHY-RX-MODEL PHY802.11b
+PHY802.11-DATA-RATE 48000000
+PHY802.11a-TX-POWER--6MBPS 20.0
+PHY802.11a-TX-POWER--9MBPS 20.0
+PHY802.11a-TX-POWER-12MBPS 19.0
+PHY802.11a-TX-POWER-18MBPS 19.0
+PHY802.11a-TX-POWER-24MBPS 18.0
+PHY802.11a-TX-POWER-36MBPS 18.0
+PHY802.11a-TX-POWER-48MBPS 16.0
+PHY802.11a-TX-POWER-54MBPS 16.0
+PHY802.11a-RX-SENSITIVITY--6MBPS -85.0
+PHY802.11a-RX-SENSITIVITY--9MBPS -85.0
+PHY802.11a-RX-SENSITIVITY-12MBPS -83.0
+PHY802.11a-RX-SENSITIVITY-18MBPS -83.0
+PHY802.11a-RX-SENSITIVITY-24MBPS -78.0
+PHY802.11a-RX-SENSITIVITY-36MBPS -78.0
+PHY802.11a-RX-SENSITIVITY-48MBPS -69.0
+PHY802.11a-RX-SENSITIVITY-54MBPS -69.0
+PHY-RX-MODEL PHY802.11a
 DUMMY-ANTENNA-MODEL-CONFIG-FILE-SPECIFY NO
 ANTENNA-MODEL OMNIDIRECTIONAL
 ANTENNA-GAIN 0.0
@@ -668,9 +677,10 @@ SUBNET N#{MASK}-%s {%d thru %d, %d} %d %d 0" \
 		PLACEMENT_X_WIRELESS_SUBNET_SIMU_NET \
 			+ TERRAIN_MARGIN, PLACEMENT_Y_SUBNET + TERRAIN_MARGIN]
 scenarioConfigFileObj.puts "
-[ N#{MASK}-%s ] PHY-MODEL PHY802.11b
+[ N#{MASK}-%s ] PHY-MODEL PHY802.11a
 [ N#{MASK}-%s ] PHY802.11-AUTO-RATE-FALLBACK NO
-[ N#{MASK}-%s ] PHY-RX-MODEL PHY802.11b
+[ N#{MASK}-%s ] PHY802.11-DATA-RATE #{48 * 1000 * 1000}
+[ N#{MASK}-%s ] PHY-RX-MODEL PHY802.11a
 [ N#{MASK}-%s ] DUMMY-ANTENNA-MODEL-CONFIG-FILE-SPECIFY NO
 [ N#{MASK}-%s ] ANTENNA-MODEL OMNIDIRECTIONAL
 [ N#{MASK}-%s ] ENERGY-MODEL-SPECIFICATION NONE
@@ -690,7 +700,7 @@ scenarioConfigFileObj.puts "
 
 [ N#{MASK}-%s ] ARP-ENABLED YES
 [ N#{MASK}-%s ] ARP-CACHE-EXPIRE-INTERVAL 20M" \
-	% ([IP_WIRELESS_SUBNET_SIMU_NET % IP_HOST_ID_NETWORK] * 19)
+	% ([IP_WIRELESS_SUBNET_SIMU_NET % IP_HOST_ID_NETWORK] * 20)
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.puts "# [Wireless Subnet] Mobile Data Collector"
 scenarioConfigFileObj.puts "
@@ -700,10 +710,10 @@ SUBNET N#{MASK}-%s {%d thru %d, %d} %d %d 0" \
 		PLACEMENT_X_WIRELESS_SUBNET_MDC_NET \
 			+ TERRAIN_MARGIN, PLACEMENT_Y_SUBNET + TERRAIN_MARGIN]
 scenarioConfigFileObj.puts "
-[ N#{MASK}-%s ] PHY-MODEL PHY802.11b
+[ N#{MASK}-%s ] PHY-MODEL PHY802.11a
 [ N#{MASK}-%s ] PHY802.11-AUTO-RATE-FALLBACK NO
 [ N#{MASK}-%s ] PHY802.11-DATA-RATE #{(itemMDC[1] * 1000).round}
-[ N#{MASK}-%s ] PHY-RX-MODEL PHY802.11b" \
+[ N#{MASK}-%s ] PHY-RX-MODEL PHY802.11a" \
 	% ([IP_WIRELESS_SUBNET_MDC_NET % IP_HOST_ID_NETWORK] * 4)
 scenarioConfigFileObj.puts "
 [ N#{MASK}-%s ] MAC-PROTOCOL MACDOT11
@@ -777,6 +787,7 @@ scenarioConfigFileObj.puts "# Interface Configuration"
 scenarioConfigFileObj.puts
 allAddresses = []
 setAddressesAP = []
+setAddressesDS = []
 scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP
 [%d] IP-ADDRESS[0] %s # Server: Wired" \
 	% ([itemServer[-2]] * 2 + [IP_WIRED_SUBNET % itemServer[-1]])
@@ -814,7 +825,7 @@ scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[1] IP
 	+ "#{SSID_WIRELESS_SUBNET_MDC_NET}"
 allAddresses << IP_WIRELESS_SUBNET_SIMU_NET % itemMDC[-1]
 allAddresses << IP_WIRELESS_SUBNET_MDC_NET % itemMDC[-1]
-setAddressesAP << IP_WIRELESS_SUBNET_MDC_NET % itemMDC[-1]
+# setAddressesAP << IP_WIRELESS_SUBNET_MDC_NET % itemMDC[-1]
 scenarioConfigFileObj.puts
 for j in 0...listAP.size
 	itemAP = listAP[j]
@@ -845,6 +856,7 @@ for j in 0...listDS.size
 	scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP" % itemDS[-2]
 	scenarioConfigFileObj.puts "[%d] IP-ADDRESS[0] %s" \
 		% [itemDS[-2], IP_WIRELESS_SUBNET_MDC_NET % itemDS[-1]]
+	setAddressesDS << IP_WIRELESS_SUBNET_MDC_NET % itemDS[-1]
 	allAddresses << IP_WIRELESS_SUBNET_MDC_NET % itemDS[-1]
 end
 scenarioConfigFileObj.puts
@@ -897,21 +909,9 @@ scenarioConfigFileObj.puts "
 [%s] LINK-BANDWIDTH 10000000" \
 	% ([[IP_WIRED_SUBNET % itemServer[-1], \
 		IP_WIRED_SUBNET % itemRouter[-1]].join(" ")] * 2)
-# scenarioConfigFileObj.puts
-# for j in 0...listAP.size
-# 	itemAP = listAP[j]
-# 	scenarioConfigFileObj.puts "[%s] PHY-MODEL PHY802.11b" \
-# 		% (IP_WIRELESS_SUBNET_SIMU_NET % itemAP[-1])
-# 	scenarioConfigFileObj.puts "[%s] PHY802.11-AUTO-RATE-FALLBACK NO" \
-# 		% (IP_WIRELESS_SUBNET_SIMU_NET % itemAP[-1])
-# 	scenarioConfigFileObj.puts "[%s] PHY802.11-DATA-RATE %d" \
-# 		% [IP_WIRELESS_SUBNET_SIMU_NET % itemAP[-1], (itemAP[1] * 1000).round]
-# end
+setAddressesAPWithMDC = setAddressesAP \
+	+ [IP_WIRELESS_SUBNET_MDC_NET % itemMDC[-1]];
 scenarioConfigFileObj.puts "
-[%s] PHY802.11b-TX-POWER--1MBPS #{TX_POWER_AP}
-[%s] PHY802.11b-TX-POWER--2MBPS #{TX_POWER_AP}
-[%s] PHY802.11b-TX-POWER--6MBPS #{TX_POWER_AP}
-[%s] PHY802.11b-TX-POWER-11MBPS #{TX_POWER_AP}
 [%s] MAC-DOT11-AP-SUPPORT-PS-MODE NO
 [%s] MAC-DOT11-DTIM-PERIOD 3
 [%s] MAC-DOT11-SCAN-TYPE DISABLED
@@ -920,14 +920,54 @@ scenarioConfigFileObj.puts "
 [%s] MAC-DOT11-AP YES
 [%s] MAC-DOT11-PC NO
 [%s] MAC-ADDRESS-CONFIG-FILE #{SCENARIO_NAME}.mac-address
-[%s] DUMMY-MAC-ADDRESS YES" % ([setAddressesAP.join(" ")] * 13)
+[%s] DUMMY-MAC-ADDRESS YES" % ([setAddressesAPWithMDC.join(" ")] * 9)
 scenarioConfigFileObj.puts "
 [%s] IP-QUEUE-PRIORITY-QUEUE-SIZE[0] 150000
 [%s] IP-QUEUE-TYPE[0] FIFO
 [%s] IP-QUEUE-PRIORITY-QUEUE-SIZE[1] 150000
 [%s] IP-QUEUE-TYPE[1] FIFO
 [%s] IP-QUEUE-PRIORITY-QUEUE-SIZE[2] 150000
-[%s] IP-QUEUE-TYPE[2] FIFO" % ([allAddresses.join(" ")] * 6)
+[%s] IP-QUEUE-TYPE[2] FIFO" % ([setAddressesAPWithMDC.join(" ")] * 6)
+scenarioConfigFileObj.puts "
+[%s] PHY802.11a-TX-POWER--6MBPS #{TX_POWER_AP}
+[%s] PHY802.11a-TX-POWER--9MBPS #{TX_POWER_AP}
+[%s] PHY802.11a-TX-POWER-12MBPS #{TX_POWER_AP}
+[%s] PHY802.11a-TX-POWER-18MBPS #{TX_POWER_AP}
+[%s] PHY802.11a-TX-POWER-24MBPS #{TX_POWER_AP}
+[%s] PHY802.11a-TX-POWER-36MBPS #{TX_POWER_AP}
+[%s] PHY802.11a-TX-POWER-48MBPS #{TX_POWER_AP}
+[%s] PHY802.11a-TX-POWER-54MBPS #{TX_POWER_AP}" % \
+	([setAddressesAP.join(" ")] * 8)
+scenarioConfigFileObj.puts "
+[%s] PHY802.11a-TX-POWER--6MBPS #{TX_POWER_DS}
+[%s] PHY802.11a-TX-POWER--9MBPS #{TX_POWER_DS}
+[%s] PHY802.11a-TX-POWER-12MBPS #{TX_POWER_DS}
+[%s] PHY802.11a-TX-POWER-18MBPS #{TX_POWER_DS}
+[%s] PHY802.11a-TX-POWER-24MBPS #{TX_POWER_DS}
+[%s] PHY802.11a-TX-POWER-36MBPS #{TX_POWER_DS}
+[%s] PHY802.11a-TX-POWER-48MBPS #{TX_POWER_DS}
+[%s] PHY802.11a-TX-POWER-54MBPS #{TX_POWER_DS}" % \
+	([setAddressesDS.join(" ")] * 8)
+scenarioConfigFileObj.puts "
+[%s] PHY802.11a-TX-POWER--6MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER--9MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-12MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-18MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-24MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-36MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-48MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-54MBPS #{TX_POWER_MDC}" % \
+	([IP_WIRELESS_SUBNET_SIMU_NET % itemMDC[-1]] * 8)
+scenarioConfigFileObj.puts "
+[%s] PHY802.11a-TX-POWER--6MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER--9MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-12MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-18MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-24MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-36MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-48MBPS #{TX_POWER_MDC}
+[%s] PHY802.11a-TX-POWER-54MBPS #{TX_POWER_MDC}" % \
+	([IP_WIRELESS_SUBNET_MDC_NET % itemMDC[-1]] * 8)
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.close
 
@@ -938,8 +978,8 @@ puts "Writing to file: " + scenarioTestConfigFileName
 scenarioTestConfigFileObj = File.open(scenarioTestConfigFileName, "a")
 scenarioTestConfigFileObj.puts "# Test Configuration"
 scenarioTestConfigFileObj.puts "
-APP-CONFIG-FILE #{SCENARIO_NAME}_test.app
-NODE-POSITION-FILE #{SCENARIO_NAME}_test.nodes"
+APP-CONFIG-FILE #{SCENARIO_NAME}.test.app
+NODE-POSITION-FILE #{SCENARIO_NAME}.test.nodes"
 scenarioTestConfigFileObj.puts
 scenarioTestConfigFileObj.close
 
@@ -998,8 +1038,8 @@ puts "Copying to file: " + scenarioTestNodesFileName
 FileUtils.cp(scenarioNodesFileName, scenarioTestNodesFileName)
 
 TIME_SITES_TEST = { \
-	ROLE_AP => 60, \
-	ROLE_DS => 20 \
+	ROLE_AP => 120, \
+	ROLE_DS => 120 \
 }
 
 puts "Writing to file: " + scenarioTestNodesFileName
@@ -1056,7 +1096,7 @@ FileUtils.cp(scenarioAppFileName, scenarioTestAppFileName)
 
 puts "Writing to file: " + scenarioTestAppFileName
 scenarioAppConfigFileObj = File.open(scenarioTestAppFileName, "a")
-scenarioAppConfigFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]}"
+scenarioAppConfigFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]} -"
 scenarioAppConfigFileObj.puts
 scenarioAppConfigFileObj.close
 
@@ -1121,7 +1161,7 @@ scenarioDisplayFileObj.close
 puts "Writing to file: " + scenarioTestScriptName
 scenarioTestScriptObj = File.open(scenarioTestScriptName, "w")
 scenarioTestScriptObj.puts \
-	"$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}_test.config"
+	"$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}.test.config"
 scenarioTestScriptObj.puts
 scenarioTestScriptObj.close
 FileUtils.chmod "u+x", scenarioTestScriptName
