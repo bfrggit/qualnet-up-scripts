@@ -54,7 +54,7 @@ SSID_WIRELESS_SUBNET_SIMU_NET = "SimuNet"
 SSID_WIRELESS_SUBNET_MDC_NET = "MDCNet"
 
 MAC_ADDRESS_PREFIX = "51:80:00:46"
-MAC_ADDRESS_OFFSET = 1
+MAC_ADDRESS_OFFSET = 1 # MUST be strictly greater than zero
 
 IP_WIRELESS_SUBNET_SIMU_NET = "190.46.%d.%d"
 IP_WIRELESS_SUBNET_MDC_NET = "190.47.%d.%d"
@@ -409,6 +409,8 @@ scenarioTestScriptName = scenarioDirName + "/test.sh"
 scenarioTestAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.app"
 scenarioTestConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.config"
 scenarioTestNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.nodes"
+planImmediateFileName = scenarioDirName + "/immediate.plan"
+planTerminateFileName = scenarioDirName + "/terminate.plan"
 
 # Generate scenario configuration
 puts "Writing to file: " + scenarioConfigFileName
@@ -1169,6 +1171,37 @@ scenarioTestScriptObj.puts \
 scenarioTestScriptObj.puts
 scenarioTestScriptObj.close
 FileUtils.chmod "u+x", scenarioTestScriptName
+
+# Generate basic plans
+puts "Writing to file: " + planTerminateFileName
+planTerminateFileObj = File.open(planTerminateFileName, "w")
+planTerminateFileObj.puts listDS.size
+for j in 0...listDS.size
+	itemDS = listDS[j]
+	indexAP = listAP.size - 1
+	indexAP = -(MAC_ADDRESS_OFFSET + 1) if itemDS[0] > listAP[-1][0]
+	planTerminateFileObj.puts "#{j + 1} #{indexAP + MAC_ADDRESS_OFFSET}"
+end
+planTerminateFileObj.puts
+planTerminateFileObj.close
+
+puts "Writing to file: " + planImmediateFileName
+planImmediateFileObj = File.open(planImmediateFileName, "w")
+planImmediateFileObj.puts listDS.size
+indexAP = 0
+for j in 0...listDS.size
+	itemDS = listDS[j]
+	while listAP[indexAP][0] < itemDS[0] and indexAP < listAP.size
+		indexAP += 1
+	end
+	if indexAP < listAP.size
+		planImmediateFileObj.puts "#{j + 1} #{indexAP + MAC_ADDRESS_OFFSET}"
+	else
+		planImmediateFileObj.puts "#{j + 1} #{-1}"
+	end
+end
+planImmediateFileObj.puts
+planImmediateFileObj.close
 
 # Copy configuration file
 puts "Copying to file: " + deploymentFileName
