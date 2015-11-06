@@ -399,12 +399,13 @@ puts
 
 puts "Writing scenario files to directory: " + scenarioDirName
 deploymentFileName = scenarioDirName + "/#{SCENARIO_NAME}.deployment"
-scenarioAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.app"
+scenarioAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.part.app"
 scenarioConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.part.config"
 scenarioDisplayFileName = scenarioDirName + "/#{SCENARIO_NAME}.display"
 scenarioHardwareAddressFileName = scenarioDirName \
 	+ "/#{SCENARIO_NAME}.mac-address"
 scenarioNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.part.nodes"
+scenarioRunScriptName = scenarioDirName + "/run.sh"
 scenarioTestScriptName = scenarioDirName + "/test.sh"
 scenarioTestAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.app"
 scenarioTestConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.config"
@@ -1108,11 +1109,11 @@ scenarioAppConfigFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]} -"
 scenarioAppConfigFileObj.puts
 scenarioAppConfigFileObj.close
 
-puts "Writing to file: " + scenarioAppFileName
-scenarioAppFileObj = File.open(scenarioAppFileName, "a")
-scenarioAppFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]}"
-scenarioAppFileObj.puts
-scenarioAppFileObj.close
+# puts "Writing to file: " + scenarioAppFileName
+# scenarioAppFileObj = File.open(scenarioAppFileName, "a")
+# scenarioAppFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]}"
+# scenarioAppFileObj.puts
+# scenarioAppFileObj.close
 
 def convertItemIndexToHardwareAddress(index)
 	raise ArgumentError if index + MAC_ADDRESS_OFFSET + 1 > 256 * 256
@@ -1164,6 +1165,15 @@ nodeOrientationIcon=true
 nodeOrientationArrow=false"
 scenarioDisplayFileObj.puts
 scenarioDisplayFileObj.close
+
+# Generate run script
+puts "Writing to file: " + scenarioRunScriptName
+scenarioRunScriptObj = File.open(scenarioRunScriptName, "w")
+scenarioRunScriptObj.puts \
+	"$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}.config"
+scenarioRunScriptObj.puts
+scenarioRunScriptObj.close
+FileUtils.chmod "u+x", scenarioRunScriptName
 
 # Generate test script
 puts "Writing to file: " + scenarioTestScriptName
