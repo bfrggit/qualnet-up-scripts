@@ -412,6 +412,7 @@ scenarioTestConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.config"
 scenarioTestNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.nodes"
 planImmediateFileName = scenarioDirName + "/immediate.plan"
 planTerminateFileName = scenarioDirName + "/terminate.plan"
+simulationScriptName = scenarioDirName + "/simu.rb"
 
 # Generate scenario configuration
 puts "Writing to file: " + scenarioConfigFileName
@@ -557,7 +558,7 @@ ANTENNA-CONNECTION-LOSS 0.2
 ANTENNA-ORIENTATION-AZIMUTH 0
 ANTENNA-ORIENTATION-ELEVATION 0
 PHY-TEMPERATURE 290.0
-PHY-NOISE-FACTOR 10.0
+PHY-NOISE-FACTOR 0.0
 ENERGY-MODEL-SPECIFICATION NONE"
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.puts "# MAC Layer"
@@ -577,7 +578,7 @@ LINK-RX-ANTENNA-CABLE-LOSS 1.5
 LINK-TX-POWER 30
 LINK-RX-SENSITIVITY -80
 LINK-NOISE-TEMPERATURE 290
-LINK-NOISE-FACTOR 4
+LINK-NOISE-FACTOR 0
 LINK-TERRAIN-TYPE PLAINS
 LINK-PROPAGATION-RAIN-INTENSITY 0
 LINK-PROPAGATION-TEMPERATURE 25
@@ -691,6 +692,7 @@ scenarioConfigFileObj.puts "
 [ N#{MASK}-%s ] DUMMY-ANTENNA-MODEL-CONFIG-FILE-SPECIFY NO
 [ N#{MASK}-%s ] ANTENNA-MODEL OMNIDIRECTIONAL
 [ N#{MASK}-%s ] ENERGY-MODEL-SPECIFICATION NONE
+[ N#{MASK}-%s ] PHY-NOISE-FACTOR 0
 
 [ N#{MASK}-%s ] MAC-PROTOCOL MACDOT11
 [ N#{MASK}-%s ] MAC-DOT11-ASSOCIATION DYNAMIC
@@ -707,7 +709,7 @@ scenarioConfigFileObj.puts "
 
 [ N#{MASK}-%s ] ARP-ENABLED YES
 [ N#{MASK}-%s ] ARP-CACHE-EXPIRE-INTERVAL 20M" \
-	% ([IP_WIRELESS_SUBNET_SIMU_NET % IP_HOST_ID_NETWORK] * 20)
+	% ([IP_WIRELESS_SUBNET_SIMU_NET % IP_HOST_ID_NETWORK] * 21)
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.puts "# [Wireless Subnet] Mobile Data Collector"
 scenarioConfigFileObj.puts "
@@ -1218,6 +1220,10 @@ planImmediateFileObj.close
 # Copy configuration file
 puts "Copying to file: " + deploymentFileName
 FileUtils.cp configFileName, deploymentFileName
+
+# Copy simulation file
+puts "Copying to file: " + simulationScriptName
+FileUtils.cp "simu.rb", simulationScriptName
 
 #
 puts
