@@ -1091,10 +1091,10 @@ scenarioTestConfigFileObj.close
 # Generate application specification
 puts "Writing to file: " + scenarioAppFileName
 scenarioAppFileObj = File.open(scenarioAppFileName, "w")
-scenarioAppFileObj.puts "UP CLOUD #{itemServer[-2]}"
+scenarioAppFileObj.puts "UP #{itemServer[-2]} 127.0.0.1 CLOUD"
 for j in 0...listDS.size
 	itemDS = listDS[j]
-	scenarioAppFileObj.puts "UP DATA %d %d %d %d %d %.4f" \
+	scenarioAppFileObj.puts "UP %d %d DATA %d %d %d %.4f" \
 		% [itemDS[-2], itemMDC[-2], \
 			j + 1, \
 			itemDS[1], itemDS[2] + MDC_WAIT_BEFORE_START, itemDS[3]]
@@ -1107,7 +1107,7 @@ FileUtils.cp(scenarioAppFileName, scenarioTestAppFileName)
 
 puts "Writing to file: " + scenarioTestAppFileName
 scenarioAppConfigFileObj = File.open(scenarioTestAppFileName, "a")
-scenarioAppConfigFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]} -"
+scenarioAppConfigFileObj.puts "UP #{itemMDC[-2]} #{itemServer[-2]} MDC -"
 scenarioAppConfigFileObj.puts
 scenarioAppConfigFileObj.close
 

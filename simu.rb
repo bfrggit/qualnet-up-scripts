@@ -307,7 +307,7 @@ FileUtils.cp scenarioPartAppFileName, scenarioAppFileName
 puts "Writing to file: " + scenarioAppFileName
 scenarioAppFileObj = File.open(scenarioAppFileName, "a")
 scenarioAppFileObj.puts \
-	"UP MDC #{nodeMDCStr} #{nodeServerStr} #{planFileName}"
+	"UP #{nodeMDCStr} #{nodeServerStr} MDC #{planFileName}"
 scenarioAppFileObj.puts
 scenarioAppFileObj.close
 puts
