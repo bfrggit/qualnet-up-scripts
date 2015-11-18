@@ -1205,7 +1205,7 @@ planImmediateFileObj.puts listDS.size
 indexAP = 0
 for j in 0...listDS.size
 	itemDS = listDS[j]
-	while listAP[indexAP][0] < itemDS[0] and indexAP < listAP.size
+	while indexAP < listAP.size and listAP[indexAP][0] < itemDS[0]
 		indexAP += 1
 	end
 	if indexAP < listAP.size

@@ -545,8 +545,15 @@ SIMULATION-TIME %dS" % (nextT + SIMULATION_WAIT_AFTER_END).ceil
 	simulation = Open3.popen3 command
 	errLines = simulation[2].readlines
 	if errLines.size > 0
-		puts "Error occurred in simulation:"
-		puts errLines
+		errOutCount = 0
+		puts "Error(s) and warning(s) in simulation:"
+		for errLine in errLines
+			next if /Warning.*developer\/src\/mac\_802\_3\.cpp\:\d+/ =~ errLine
+			next if /802\.3.*collision\sdetection.*propagation/ =~ errLine
+			STDERR.puts errLine.strip
+			errOutCount += 1
+		end
+		puts "Ignored" if errOutCount < 1
 		puts
 	end
 end
