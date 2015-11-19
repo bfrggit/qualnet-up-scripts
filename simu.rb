@@ -1,7 +1,7 @@
 # Author: Charles ZHU
 #
 require "fileutils"
-require "open3"
+# require "open3"
 
 if ARGV.size != 1
 	STDERR.puts "Usage: ruby simu.rb PLAN.plan"
@@ -20,7 +20,7 @@ end
 MY_NAME = "simu.rb"
 SCENARIO_NAME = "up"
 
-SIMULATION_WAIT_AFTER_END = 90
+SIMULATION_WAIT_AFTER_END = 600
 
 NODES_PER_NETWORK_MAXIMUM = 240
 
@@ -541,9 +541,10 @@ SIMULATION-TIME %dS" % (nextT + SIMULATION_WAIT_AFTER_END).ceil
 	scenarioConfigFileObj.puts
 	scenarioConfigFileObj.close
 	puts
-	command = "./#{scenarioRunScriptName}"
-	simulation = Open3.popen3 command
-	errLines = simulation[2].readlines
+	command = "./#{scenarioRunScriptName} 2>&1 >/dev/null"
+	# simulation = Open3.popen3 command
+	# errLines = simulation[2].readlines
+	errLines = %x(#{command}).split(/[\n\r]+/)
 	if errLines.size > 0
 		errOutCount = 0
 		puts "Error(s) and warning(s) in simulation:"
