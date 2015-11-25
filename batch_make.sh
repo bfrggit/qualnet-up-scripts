@@ -17,7 +17,7 @@ find $1 -name "case_*" | while read line ; do
 	if [ -d "$line/case" ] ; then
 		echo "Found an existing scenario directory: $line/case"
 	else
-		echo "Writing to scenario diretory: $line/case"
+		echo "Writing to scenario directory: $line/case"
 		(
 			IFS=$'\n'
 
