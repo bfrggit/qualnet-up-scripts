@@ -1246,7 +1246,7 @@ scenarioDisplayFileObj.close
 puts "Writing to file: " + scenarioRunScriptName
 scenarioRunScriptObj = File.open(scenarioRunScriptName, "w")
 scenarioRunScriptObj.puts "#!/bin/bash
-$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}.config"
+$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}.config 2>error.log"
 # scenarioRunScriptObj.puts
 scenarioRunScriptObj.close
 FileUtils.chmod "u+x", scenarioRunScriptName
