@@ -25,7 +25,7 @@ TERRAIN_WIDTH = 800
 TERRAIN_LENGTH_MINIMUM = 800
 
 MDC_WAIT_BEFORE_START = 30
-SIMULATION_WAIT_AFTER_END = 90
+SIMULATION_WAIT_AFTER_END = 300
 
 NODE_NUMBER_ZERO = 100
 NODES_PER_NETWORK_MAXIMUM = 240
@@ -75,6 +75,9 @@ IP_HOST_ID_BYTE_2_END = 110
 IP_HOST_ID_BYTE_2_OFFSET = 100
 
 PROPOGATION_DELAY_ROUTER_TO_SERVER = 10
+
+EST_TIME_WAIT_CONNECTION_AP = 60
+EST_TIME_WAIT_CONNECTION_DS = 30
 
 # Open configuration file
 text = nil
@@ -399,20 +402,20 @@ puts
 
 puts "Writing scenario files to directory: " + scenarioDirName
 deploymentFileName = scenarioDirName + "/#{SCENARIO_NAME}.deployment"
-scenarioAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.part.app"
-scenarioConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.part.config"
+scenarioAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.app"
+scenarioConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.config"
 scenarioDisplayFileName = scenarioDirName + "/#{SCENARIO_NAME}.display"
 scenarioHardwareAddressFileName = scenarioDirName \
 	+ "/#{SCENARIO_NAME}.mac-address"
-scenarioNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.part.nodes"
+scenarioNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.nodes"
 scenarioRunScriptName = scenarioDirName + "/run.sh"
 scenarioTestScriptName = scenarioDirName + "/test.sh"
 scenarioTestAppFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.app"
 scenarioTestConfigFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.config"
-scenarioTestNodesFileName = scenarioDirName + "/#{SCENARIO_NAME}.test.nodes"
 planImmediateFileName = scenarioDirName + "/immediate.plan"
 planTerminateFileName = scenarioDirName + "/terminate.plan"
-simulationScriptName = scenarioDirName + "/simu.rb"
+pathFileName = scenarioDirName + "/path"
+simulationScriptName = scenarioDirName + "/simu.sh"
 
 # Generate scenario configuration
 puts "Writing to file: " + scenarioConfigFileName
@@ -988,7 +991,7 @@ scenarioTestConfigFileObj = File.open(scenarioTestConfigFileName, "a")
 scenarioTestConfigFileObj.puts "# Test Configuration"
 scenarioTestConfigFileObj.puts "
 APP-CONFIG-FILE #{SCENARIO_NAME}.test.app
-NODE-POSITION-FILE #{SCENARIO_NAME}.test.nodes"
+NODE-POSITION-FILE #{SCENARIO_NAME}.nodes"
 scenarioTestConfigFileObj.puts
 scenarioTestConfigFileObj.close
 
@@ -1005,7 +1008,7 @@ scenarioConfigFileObj.close
 puts "Writing to file: " + scenarioNodesFileName
 scenarioNodesFileObj = File.open(scenarioNodesFileName, "w")
 nodeLineFormat = "%d 0 (%.4f, %.4f, %.4f) 0 0"
-nodeLineFormatDelayed = "%d #{MDC_WAIT_BEFORE_START}S (%.4f, %.4f, %.4f) 0 0"
+# nodeLineFormatDelayed = "%d #{MDC_WAIT_BEFORE_START}S (%.4f, %.4f, %.4f) 0 0"
 scenarioNodesFileObj.puts nodeLineFormat \
 	% [itemSwitch[-2], \
 		TERRAIN_MARGIN + PLACEMENT_X_SWITCH, \
@@ -1022,10 +1025,10 @@ scenarioNodesFileObj.puts nodeLineFormat \
 	% [itemMDC[-2], \
 		TERRAIN_MARGIN + 0, \
 		TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
-scenarioNodesFileObj.puts nodeLineFormatDelayed \
-	% [itemMDC[-2], \
-		TERRAIN_MARGIN + 0, \
-		TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+# scenarioNodesFileObj.puts nodeLineFormatDelayed \
+# 	% [itemMDC[-2], \
+# 		TERRAIN_MARGIN + 0, \
+# 		TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
 for j in 0...listAP.size
 	itemAP = listAP[j]
 	scenarioNodesFileObj.puts nodeLineFormat \
@@ -1040,51 +1043,98 @@ for j in 0...listDS.size
 			TERRAIN_MARGIN + itemDS[0], \
 			TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
 end
-scenarioNodesFileObj.puts
+# scenarioNodesFileObj.puts
 scenarioNodesFileObj.close
 
-puts "Copying to file: " + scenarioTestNodesFileName
-FileUtils.cp(scenarioNodesFileName, scenarioTestNodesFileName)
+# puts "Copying to file: " + scenarioTestNodesFileName
+# FileUtils.cp(scenarioNodesFileName, scenarioTestNodesFileName)
 
-TIME_SITES_TEST = { \
-	ROLE_AP => 120, \
-	ROLE_DS => 120 \
-}
+# TIME_SITES_TEST = { \
+# 	ROLE_AP => 120, \
+# 	ROLE_DS => 120 \
+# }
 
-puts "Writing to file: " + scenarioTestNodesFileName
-scenarioNodesConfigFileObj = File.open(scenarioTestNodesFileName, "a")
+# Generate path file
+pathLineFormat = "%.2f %.4f %.4f"
+
+# Collect information of stop(s)
+events = []
+for j in 0...listAP.size
+	itemAP = listAP[j]
+	events << [itemAP[0], ROLE_AP, j + 1] # Position, role, identifier
+end
+for j in 0...listDS.size
+	itemDS = listDS[j]
+	events << [itemDS[0], ROLE_DS, j + 1] # Position, role, identifier
+end
+events.sort! {|x, y| x[0] <=> y[0]}
+
+stops = []
+for j in 0...events.size
+	event = events[j]
+	if stops.size < 1 or stops[-1][0] < event[0]
+		stops << [event[0], []] # Position, list of events
+	end
+	stops[-1][1] << [event[1], event[2]] # Role, identifier
+end
+
+puts "Writing to file: " + pathFileName
+pathFileObj = File.open(pathFileName, "w")
+pathFileObj.puts(stops.size + 1)
+
 xNode = 0
 tNode = MDC_WAIT_BEFORE_START
-listSites = []
-for itemAP in listAP
-	listSites << [itemAP[0], ROLE_AP]
-end
-for itemDS in listDS
-	listSites << [itemDS[0], ROLE_DS]
-end
-listSites.sort! {|x, y| x[0] <=> y[0]}
-nodeLineFormat = "#{itemMDC[-2]} %dS (%.4f, %.4f, %.4f) 0 0"
-for itemSite in listSites
-	if xNode < itemSite[0]
-		tNode += (1.0 * (itemSite[0] - xNode) / itemMDC[0]).round
-		xNode = itemSite[0]
-		scenarioNodesConfigFileObj.puts nodeLineFormat \
-			% [tNode, TERRAIN_MARGIN + xNode, TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
+tTotal = tNode
+sTotal = 0
+rateSlowest = nil
+pathFileObj.puts pathLineFormat \
+	% [tNode, TERRAIN_MARGIN, TERRAIN_MARGIN + PLACEMENT_Y_PATH]
+pathFileObj.puts 0
+pathFileObj.puts 0
+for j in 0...stops.size
+	stop = stops[j]
+	tNode = 1.0 * (stop[0] - xNode) / itemMDC[0]
+	xNode = stop[0]
+	pathFileObj.puts pathLineFormat \
+		% [tNode, TERRAIN_MARGIN + xNode, TERRAIN_MARGIN + PLACEMENT_Y_PATH]
+
+	tTotal += tNode
+	lsAPStop = []
+	lsDSStop = []
+	for event in stop[1]
+		if event[0] == ROLE_AP
+			itemAP = listAP[event[1] - 1]
+			lsAPStop << event[1]
+			if not rateSlowest or itemAP[1] < rateSlowest
+				rateSlowest = itemAP[1]
+			end
+		elsif event[0] == ROLE_DS
+			itemDS = listDS[event[1] - 1]
+			lsDSStop << event[1]
+			sTotal += itemDS[1]
+		end
 	end
-	tNode += TIME_SITES_TEST[itemSite[1]]
-	scenarioNodesConfigFileObj.puts nodeLineFormat \
-		% [tNode, TERRAIN_MARGIN + xNode, TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
-	scenarioNodesConfigFileObj
+	pathFileObj.puts ([lsAPStop.size] + lsAPStop).join " "
+	pathFileObj.puts ([lsDSStop.size] + lsDSStop).join " "
 end
-tNode += SIMULATION_WAIT_AFTER_END
-scenarioNodesConfigFileObj.puts
-scenarioNodesConfigFileObj.close
+tTotal += EST_TIME_WAIT_CONNECTION_AP * listAP.size
+tTotal += EST_TIME_WAIT_CONNECTION_DS * listDS.size
+tTotal += sTotal * 8.0 / itemMDC[1]
+tTotal += sTotal * 8.0 / rateSlowest
+tTotal += SIMULATION_WAIT_AFTER_END
+pathFileObj.puts
+pathFileObj.close
+
+# Append to scenario configuration
+puts "Writing to file: " + scenarioConfigFileName
+scenarioConfigFileObj = File.open(scenarioConfigFileName, "a")
+scenarioConfigFileObj.puts "SIMULATION-TIME %dS" % tTotal.ceil
+scenarioConfigFileObj.puts
+scenarioConfigFileObj.close
 
 puts "Writing to file: " + scenarioTestConfigFileName
 scenarioTestConfigFileObj = File.open(scenarioTestConfigFileName, "a")
-scenarioTestConfigFileObj.puts "# Test Configuration"
-scenarioTestConfigFileObj.puts "
-SIMULATION-TIME #{tNode}S"
+scenarioTestConfigFileObj.puts "SIMULATION-TIME %dS" % tTotal.ceil
 scenarioTestConfigFileObj.puts
 scenarioTestConfigFileObj.close
 
@@ -1107,7 +1157,7 @@ FileUtils.cp(scenarioAppFileName, scenarioTestAppFileName)
 
 puts "Writing to file: " + scenarioTestAppFileName
 scenarioAppConfigFileObj = File.open(scenarioTestAppFileName, "a")
-scenarioAppConfigFileObj.puts "UP #{itemMDC[-2]} #{itemServer[-2]} MDC -"
+scenarioAppConfigFileObj.puts "UP #{itemMDC[-2]} #{itemServer[-2]} MDC path -"
 scenarioAppConfigFileObj.puts
 scenarioAppConfigFileObj.close
 
@@ -1171,18 +1221,18 @@ scenarioDisplayFileObj.close
 # Generate run script
 puts "Writing to file: " + scenarioRunScriptName
 scenarioRunScriptObj = File.open(scenarioRunScriptName, "w")
-scenarioRunScriptObj.puts \
-	"$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}.config"
-scenarioRunScriptObj.puts
+scenarioRunScriptObj.puts "#!/bin/bash
+$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}.config"
+# scenarioRunScriptObj.puts
 scenarioRunScriptObj.close
 FileUtils.chmod "u+x", scenarioRunScriptName
 
 # Generate test script
 puts "Writing to file: " + scenarioTestScriptName
 scenarioTestScriptObj = File.open(scenarioTestScriptName, "w")
-scenarioTestScriptObj.puts \
-	"$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}.test.config"
-scenarioTestScriptObj.puts
+scenarioTestScriptObj.puts "#!/bin/bash
+$QUALNET_HOME/bin/qualnet #{SCENARIO_NAME}.test.config"
+# scenarioTestScriptObj.puts
 scenarioTestScriptObj.close
 FileUtils.chmod "u+x", scenarioTestScriptName
 
@@ -1221,9 +1271,22 @@ planImmediateFileObj.close
 puts "Copying to file: " + deploymentFileName
 FileUtils.cp configFileName, deploymentFileName
 
-# Copy simulation file
-puts "Copying to file: " + simulationScriptName
-FileUtils.cp "simu.rb", simulationScriptName
+# Generate simulation file
+puts "Writing to file: " + simulationScriptName
+simulationScriptObj = File.open(simulationScriptName, "w")
+simulationScriptObj.puts "#!/bin/bash
+if [ \"$#\" -ne 1 ] || ! [ -f \"$1\" ] ; then
+	echo \"Usage: $0 PLAN\" >&2
+	echo
+	exit 1
+fi
+
+cp #{scenarioTestAppFileName} #{scenarioAppFileName}
+sed -i -- \"s/\-/$1/g\" up.app
+./run.sh"
+# simulationScriptObj.puts
+simulationScriptObj.close
+FileUtils.chmod "u+x", simulationScriptName
 
 #
-puts
+puts "Done"
