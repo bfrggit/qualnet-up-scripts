@@ -36,4 +36,4 @@ find $1 -name "case_*" | while read line ; do
 	fi
 done
 echo "Done"
-echo
+#echo
