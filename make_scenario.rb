@@ -79,6 +79,8 @@ PROPOGATION_DELAY_ROUTER_TO_SERVER = 10
 EST_TIME_WAIT_CONNECTION_AP = 60
 EST_TIME_WAIT_CONNECTION_DS = 30
 
+STOP_DIV_DISTANCE = 0.2
+
 # Open configuration file
 text = nil
 begin
@@ -1078,9 +1080,31 @@ for j in 0...events.size
 	stops[-1][1] << [event[1], event[2]] # Role, identifier
 end
 
+stopsDiv = []
+for stop in stops
+	numAPStop = 0
+	numDSStop = 0
+	for event in stop[1]
+		numAPStop += 1 if event[0] == ROLE_AP
+		numDSStop += 1 if event[0] == ROLE_DS
+	end
+	if numAPStop > 0 and numDSStop > 0
+		stop1 = [stop[0] - STOP_DIV_DISTANCE, []]
+		stop2 = [stop[0] + STOP_DIV_DISTANCE, []]
+		for event in stop[1]
+			stop2[1] << event if event[0] == ROLE_AP
+			stop1[1] << event if event[0] == ROLE_DS
+		end
+		stopsDiv << stop1
+		stopsDiv << stop2
+	else
+		stopsDiv << stop
+	end
+end
+
 puts "Writing to file: " + pathFileName
 pathFileObj = File.open(pathFileName, "w")
-pathFileObj.puts(stops.size + 1)
+pathFileObj.puts(stopsDiv.size + 1)
 
 xNode = 0
 tNode = MDC_WAIT_BEFORE_START
@@ -1091,8 +1115,8 @@ pathFileObj.puts pathLineFormat \
 	% [tNode, TERRAIN_MARGIN, TERRAIN_MARGIN + PLACEMENT_Y_PATH]
 pathFileObj.puts 0
 pathFileObj.puts 0
-for j in 0...stops.size
-	stop = stops[j]
+for j in 0...stopsDiv.size
+	stop = stopsDiv[j]
 	tNode = 1.0 * (stop[0] - xNode) / itemMDC[0]
 	xNode = stop[0]
 	pathFileObj.puts pathLineFormat \
