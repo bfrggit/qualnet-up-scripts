@@ -23,7 +23,7 @@ find $1 -name "case_*" | while read line ; do
 			# echo $line
 			target=`echo $line | sed -rn "s/^(.*)\/(.+)\.plan$/\2/p"`
 			# echo $target
-			echo -e "\033[1;37mRunning plan: $target"
+			echo -e "\033[1;37mRunning plan: $target\033[0m"
 			echo
 			./simu.sh $target.plan
 			echo
