@@ -300,7 +300,7 @@ puts
 listAP.sort! {|x, y| x[0] <=> y[0]}
 listDS.sort! {|x, y| x[0] <=> y[0]}
 
-# Calculate terrain dimensions\
+# Calculate terrain dimensions
 puts "Generated terrain dimensions:"
 puts "Margin: #{TERRAIN_MARGIN}"
 puts "Width: #{TERRAIN_WIDTH}"
