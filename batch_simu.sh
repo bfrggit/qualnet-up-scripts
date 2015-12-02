@@ -37,3 +37,4 @@ find $1 -name "case_*" | while read line ; do
 	fi
 	cd $PWD_INIT
 done
+echo "Done"
