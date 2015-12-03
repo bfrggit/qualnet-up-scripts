@@ -233,7 +233,7 @@ text.each_line do |line|
 	lineNum += 1
 end
 
-outLine = /^[A-Za-z]+\s[A-Za-z]+\d+\sRECV\sDATA\s(\d+)\sAT\sTIME\s([\d\.])+$/
+outLine = /^[A-Za-z]+\s[A-Za-z]+\d+\sRECV\sDATA\s(\d+)\sAT\sTIME\s([\d\.]+)$/
 linesNoEmpty = []
 for j in 0...lines.size
 	line, lineNum = lines[j]
@@ -286,8 +286,12 @@ end
 sumUtility = 0.0
 sumPriority = 0.0
 for j in 0...timeUp.size
-	sumUtility += utilityF(timeUp[j] - MDC_WAIT_BEFORE_START - listDS[j][2]) \
-		* listDS[j][3]
+	actual = timeUp[j] - MDC_WAIT_BEFORE_START
+	delta = actual - listDS[j][2]
+	utility = utilityF(delta)
+	puts "identifier=%d deadline=%.2f time=%.2f delta=%.2f utility=%.4f" \
+		% [j + 1, listDS[j][2], actual, delta, utility]
+	sumUtility += utility * listDS[j][3]
 	sumPriority += listDS[j][3]
 end
 weightedAverageUtility = sumUtility / sumPriority
