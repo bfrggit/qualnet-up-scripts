@@ -289,8 +289,8 @@ for j in 0...timeUp.size
 	actual = timeUp[j] - MDC_WAIT_BEFORE_START
 	delta = actual - listDS[j][2]
 	utility = utilityF(delta)
-	puts "identifier=%d deadline=%.2f time=%.2f delta=%.2f utility=%.4f" \
-		% [j + 1, listDS[j][2], actual, delta, utility]
+# STDERR.puts "identifier=%d deadline=%.2f time=%.2f delta=%.2f utility=%.4f" \
+# 	% [j + 1, listDS[j][2], actual, delta, utility]
 	sumUtility += utility * listDS[j][3]
 	sumPriority += listDS[j][3]
 end
