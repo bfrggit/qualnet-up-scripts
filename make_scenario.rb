@@ -259,7 +259,7 @@ for j in 0...linesNoEmpty.size
 	elsif section == SECTION_DATA
 		itemDS = parseLineDS(line)
 		if not itemDS
-			STDERR.puts "Line #{lineNum}: Invalid data site"
+			STDERR.puts "Line #{lineNum}: Invalid data chunk"
 			numErrors += 1
 		else
 			listDS << itemDS
@@ -280,12 +280,12 @@ elsif listAP.size > NODES_PER_NETWORK_MAXIMUM
 else puts "Parsed #{listAP.size} access point(s)"
 end
 if listDS.size < 1
-	STDERR.puts "No data site"
+	STDERR.puts "No data chunk"
 	numErrors += 1
 elsif listDS.size > NODES_PER_NETWORK_MAXIMUM
-	STDERR.puts "Too many data sites"
+	STDERR.puts "Too many data chunks"
 	numErrors += 1
-else puts "Parsed #{listDS.size} data site(s)"
+else puts "Parsed #{listDS.size} data chunk(s)"
 end
 puts
 
@@ -300,21 +300,74 @@ puts
 listAP.sort! {|x, y| x[0] <=> y[0]}
 listDS.sort! {|x, y| x[0] <=> y[0]}
 
-# Calculate terrain dimensions
-puts "Generated terrain dimensions:"
-puts "Margin: #{TERRAIN_MARGIN}"
-puts "Width: #{TERRAIN_WIDTH}"
-terrainLength = [TERRAIN_LENGTH_MINIMUM, listAP[-1][0], listDS[-1][0]].max
-puts "Length: #{terrainLength}"
-puts
-
-# Assign roles to nodes
 ROLE_MDC = 1
 ROLE_AP = 2
 ROLE_DS = 3
 ROLE_ROUTER = 4
 ROLE_SWITCH = 5
 ROLE_SERVER = 6
+
+# Collect information of stop(s)
+events = []
+for j in 0...listAP.size
+	itemAP = listAP[j]
+	events << [itemAP[0], ROLE_AP, j + 1] # Position, role, identifier
+end
+for j in 0...listDS.size
+	itemDS = listDS[j]
+	events << [itemDS[0], ROLE_DS, j + 1] # Position, role, identifier
+end
+events.sort! {|x, y| x[0] <=> y[0]}
+
+stops = []
+for j in 0...events.size
+	event = events[j]
+	if stops.size < 1 or stops[-1][0] < event[0]
+		stops << [event[0], []] # Position, list of events
+	end
+	stops[-1][1] << [event[1], event[2]] # Role, identifier
+end
+
+stopsDiv = []
+lsDSNode = []
+for stop in stops
+	numAPStop = 0
+	numDSStop = 0
+	for event in stop[1]
+		numAPStop += 1 if event[0] == ROLE_AP
+		if event[0] == ROLE_DS
+			if numDSStop < 1
+				lsDSNode << [stop[0], []] # Position, list of identifiers
+			end
+			numDSStop += 1
+			lsDSNode[-1][1] << event[1]
+		end
+	end
+	if numAPStop > 0 and numDSStop > 0
+		stop1 = [stop[0] - STOP_DIV_DISTANCE, []]
+		stop2 = [stop[0] + STOP_DIV_DISTANCE, []]
+		for event in stop[1]
+			stop2[1] << event if event[0] == ROLE_AP
+			stop1[1] << event if event[0] == ROLE_DS
+		end
+		stopsDiv << stop1
+		stopsDiv << stop2
+	else
+		stopsDiv << stop
+	end
+end
+puts "Will make #{lsDSNode.size} data site(s)"
+puts
+
+# Calculate terrain dimensions
+puts "Generated terrain dimensions:"
+puts "Margin: #{TERRAIN_MARGIN}"
+puts "Width: #{TERRAIN_WIDTH}"
+terrainLength = [TERRAIN_LENGTH_MINIMUM, listAP[-1][0], lsDSNode[-1][0]].max
+puts "Length: #{terrainLength}"
+puts
+
+# Assign roles to nodes
 ROLES_STR = { \
 	ROLE_MDC => "Mobile data collector", \
 	ROLE_AP => "Access point", \
@@ -373,10 +426,10 @@ for j in 0...listAP.size
 	listAP[j] << convertItemIndexToHostId(j)
 	nodes << [nodeNum, ROLE_AP, j]
 end
-for j in 0...listDS.size
+for j in 0...lsDSNode.size # listDS
 	nodeNum += 1
-	listDS[j] << nodeNum
-	listDS[j] << convertItemIndexToHostId(j)
+	lsDSNode[j] << nodeNum # listDS
+	lsDSNode[j] << convertItemIndexToHostId(j) # listDS
 	nodes << [nodeNum, ROLE_DS, j]
 end
 
@@ -389,7 +442,7 @@ for j in 0...nodes.size
 	elsif nodes[j][1] == ROLE_AP
 		print IP_WIRELESS_SUBNET_SIMU_NET % listAP[nodes[j][2]][-1]
 	elsif nodes[j][1] == ROLE_DS
-		print IP_WIRELESS_SUBNET_MDC_NET % listDS[nodes[j][2]][-1]
+		print IP_WIRELESS_SUBNET_MDC_NET % lsDSNode[nodes[j][2]][-1] # listDS
 	elsif nodes[j][1] == ROLE_ROUTER
 		print IP_WIRELESS_SUBNET_SIMU_NET % itemRouter[-1] + ", "
 		print IP_WIRED_SUBNET % itemRouter[-1]
@@ -418,6 +471,8 @@ planImmediateFileName = scenarioDirName + "/immediate.plan"
 planTerminateFileName = scenarioDirName + "/terminate.plan"
 pathFileName = scenarioDirName + "/path"
 simulationScriptName = scenarioDirName + "/simu.sh"
+dataFileNamePatternRel = "data%d.data"
+dataFileNamePatternAbs = scenarioDirName + "/data%d.data"
 
 # Generate scenario configuration
 puts "Writing to file: " + scenarioConfigFileName
@@ -720,9 +775,9 @@ scenarioConfigFileObj.puts "# [Wireless Subnet] Mobile Data Collector"
 scenarioConfigFileObj.puts "
 SUBNET N#{MASK}-%s {%d thru %d, %d} %d %d 0" \
 	% [IP_WIRELESS_SUBNET_MDC_NET % IP_HOST_ID_NETWORK, \
-		listDS[0][-2], listDS[-1][-2], itemMDC[-2], \
+		lsDSNode[0][-2], lsDSNode[-1][-2], itemMDC[-2], \
 		PLACEMENT_X_WIRELESS_SUBNET_MDC_NET \
-			+ TERRAIN_MARGIN, PLACEMENT_Y_SUBNET + TERRAIN_MARGIN]
+			+ TERRAIN_MARGIN, PLACEMENT_Y_SUBNET + TERRAIN_MARGIN] # listDS
 scenarioConfigFileObj.puts "
 [ N#{MASK}-%s ] PHY-MODEL PHY802.11a
 [ N#{MASK}-%s ] PHY802.11-AUTO-RATE-FALLBACK NO
@@ -779,7 +834,7 @@ scenarioConfigFileObj.puts "
 	% [itemServer[-2], itemRouter[-2], itemSwitch[-2], \
 		itemMDC[-2], \
 		listAP[0][-2], listAP[-1][-2], \
-		listDS[0][-2], listDS[-1][-2]]
+		lsDSNode[0][-2], lsDSNode[-1][-2]] # listDS
 scenarioConfigFileObj.puts "
 [%d] MOBILITY-POSITION-GRANULARITY 1.0
 [%d] MOBILITY FILE" % ([itemMDC[-2]] * 2)
@@ -865,13 +920,13 @@ for j in 0...listAP.size
 		switchPortAddress]
 end
 scenarioConfigFileObj.puts
-for j in 0...listDS.size
-	itemDS = listDS[j]
-	scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP" % itemDS[-2]
+for j in 0...lsDSNode.size # listDS
+	nodeDS = lsDSNode[j] # listDS
+	scenarioConfigFileObj.puts "[%d] NETWORK-PROTOCOL[0] IP" % nodeDS[-2]
 	scenarioConfigFileObj.puts "[%d] IP-ADDRESS[0] %s" \
-		% [itemDS[-2], IP_WIRELESS_SUBNET_MDC_NET % itemDS[-1]]
-	setAddressesDS << IP_WIRELESS_SUBNET_MDC_NET % itemDS[-1]
-	allAddresses << IP_WIRELESS_SUBNET_MDC_NET % itemDS[-1]
+		% [nodeDS[-2], IP_WIRELESS_SUBNET_MDC_NET % nodeDS[-1]]
+	setAddressesDS << IP_WIRELESS_SUBNET_MDC_NET % nodeDS[-1]
+	allAddresses << IP_WIRELESS_SUBNET_MDC_NET % nodeDS[-1]
 end
 scenarioConfigFileObj.puts
 scenarioConfigFileObj.puts "# Node Configuration"
@@ -1038,11 +1093,11 @@ for j in 0...listAP.size
 			TERRAIN_MARGIN + itemAP[0], \
 			TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
 end
-for j in 0...listDS.size
-	itemDS = listDS[j]
+for j in 0...lsDSNode.size # listDS
+	nodeDS = lsDSNode[j] # listDS
 	scenarioNodesFileObj.puts nodeLineFormat \
-		% [itemDS[-2], \
-			TERRAIN_MARGIN + itemDS[0], \
+		% [nodeDS[-2], \
+			TERRAIN_MARGIN + nodeDS[0], \
 			TERRAIN_MARGIN + PLACEMENT_Y_PATH, 0]
 end
 # scenarioNodesFileObj.puts
@@ -1058,49 +1113,6 @@ scenarioNodesFileObj.close
 
 # Generate path file
 pathLineFormat = "%.2f %.4f %.4f"
-
-# Collect information of stop(s)
-events = []
-for j in 0...listAP.size
-	itemAP = listAP[j]
-	events << [itemAP[0], ROLE_AP, j + 1] # Position, role, identifier
-end
-for j in 0...listDS.size
-	itemDS = listDS[j]
-	events << [itemDS[0], ROLE_DS, j + 1] # Position, role, identifier
-end
-events.sort! {|x, y| x[0] <=> y[0]}
-
-stops = []
-for j in 0...events.size
-	event = events[j]
-	if stops.size < 1 or stops[-1][0] < event[0]
-		stops << [event[0], []] # Position, list of events
-	end
-	stops[-1][1] << [event[1], event[2]] # Role, identifier
-end
-
-stopsDiv = []
-for stop in stops
-	numAPStop = 0
-	numDSStop = 0
-	for event in stop[1]
-		numAPStop += 1 if event[0] == ROLE_AP
-		numDSStop += 1 if event[0] == ROLE_DS
-	end
-	if numAPStop > 0 and numDSStop > 0
-		stop1 = [stop[0] - STOP_DIV_DISTANCE, []]
-		stop2 = [stop[0] + STOP_DIV_DISTANCE, []]
-		for event in stop[1]
-			stop2[1] << event if event[0] == ROLE_AP
-			stop1[1] << event if event[0] == ROLE_DS
-		end
-		stopsDiv << stop1
-		stopsDiv << stop2
-	else
-		stopsDiv << stop
-	end
-end
 
 puts "Writing to file: " + pathFileName
 pathFileObj = File.open(pathFileName, "w")
@@ -1163,15 +1175,25 @@ scenarioTestConfigFileObj.puts
 scenarioTestConfigFileObj.close
 
 # Generate application specification
+lsDataFileNum = []
+
 puts "Writing to file: " + scenarioAppFileName
 scenarioAppFileObj = File.open(scenarioAppFileName, "w")
 scenarioAppFileObj.puts "UP #{itemServer[-2]} 127.0.0.1 CLOUD"
-for j in 0...listDS.size
-	itemDS = listDS[j]
-	scenarioAppFileObj.puts "UP %d %d DATA %d %d %d %.4f" \
-		% [itemDS[-2], itemMDC[-2], \
-			j + 1, \
-			itemDS[1], itemDS[2] + MDC_WAIT_BEFORE_START, itemDS[3]]
+for j in 0...lsDSNode.size # listDS
+	nodeDS = lsDSNode[j] # listDS
+	if nodeDS[1].size > 1
+		scenarioAppFileObj.puts "UP %d %d DATA %s" \
+			% [nodeDS[-2], itemMDC[-2], \
+				dataFileNamePatternRel % nodeDS[-2]]
+		lsDataFileNum << j
+	else
+		itemDS = listDS[nodeDS[1][0] - 1]
+		scenarioAppFileObj.puts "UP %d %d DATA %d %d %d %.4f" \
+			% [nodeDS[-2], itemMDC[-2], \
+				nodeDS[1][0], \
+				itemDS[1], itemDS[2] + MDC_WAIT_BEFORE_START, itemDS[3]]
+	end
 end
 scenarioAppFileObj.puts
 scenarioAppFileObj.close
@@ -1190,6 +1212,23 @@ scenarioAppConfigFileObj.close
 # scenarioAppFileObj.puts "UP MDC #{itemMDC[-2]} #{itemServer[-2]}"
 # scenarioAppFileObj.puts
 # scenarioAppFileObj.close
+
+# Generate data files
+for j in lsDataFileNum
+	nodeDS = lsDSNode[j]
+	dataFileName = dataFileNamePatternAbs % nodeDS[-2]
+	puts "Writing to file: " + dataFileName
+	dataFileObj = File.open(dataFileName, "w")
+	dataFileObj.puts nodeDS[1].size
+	for jDS in nodeDS[1].sort!
+		itemDS = listDS[jDS - 1]
+		dataFileObj.puts "%d %d %d %.4f" \
+			% [jDS, \
+				itemDS[1], itemDS[2] + MDC_WAIT_BEFORE_START, itemDS[3]]
+	end
+	dataFileObj.puts
+	dataFileObj.close
+end
 
 def convertItemIndexToHardwareAddress(index)
 	raise ArgumentError if index + MAC_ADDRESS_OFFSET + 1 > 256 * 256
