@@ -29,7 +29,7 @@ RUBY = `which ruby`.strip
 
 serverOutputNameWildcard = "server_server*.out"
 serverOutputPathReg = \
-	/(\d+)\/case\_(\d+)\/case\/([A-Za-z\_\d]+)\/server\_server\d+\.out$/
+	/(\d+)\/case\_(\d+)\/case\/([A-Za-z\_\d]+)\/rand\_(\d+)\/server\_server\d+\.out$/
 
 outFilesText = `find #{batchDirName} -name #{serverOutputNameWildcard}`
 outFilesText.gsub!(/\r\n?/, "\n")
@@ -38,9 +38,10 @@ outFilesText.each_line do |line|
 	path = line.strip
 	regMatch = serverOutputPathReg.match path
 	next if not regMatch
-	outFilesList << [path, regMatch[1].to_i, regMatch[2].to_i, regMatch[3]]
+	outFilesList << [path, \
+		regMatch[1].to_i, regMatch[2].to_i, regMatch[3], regMatch[4].to_i]
 end
-outFilesList.sort_by! {|x| x[1..3]}
+outFilesList.sort_by! {|x| x[1..4]}
 
 # Collect data set information
 algorithms = Hash.new
@@ -66,11 +67,11 @@ end
 valFilesList = []
 for outFile in outFilesList
 	deploymentFilePath = \
-		File.expand_path(File.dirname(outFile[0]) + "/../up.deployment")
+		File.expand_path(File.dirname(outFile[0]) + "/../../up.deployment")
 	next if not File.file? deploymentFilePath
 	valFilesList << outFile + [deploymentFilePath]
 end
-valFilesList.sort_by! {|x| x[1..3]}
+valFilesList.sort_by! {|x| x[1..4]}
 
 # Calculate rewards
 table = []
