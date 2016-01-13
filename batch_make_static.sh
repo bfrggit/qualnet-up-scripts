@@ -12,7 +12,6 @@ command -v ruby >/dev/null 2>&1 || {
 }
 
 RUBY=`which ruby`
-ALGS=("alg4" "ga")
 
 find $1 -name "case_*" | while read line ; do
 	if [ -d "$line/case" ] ; then
@@ -30,16 +29,6 @@ find $1 -name "case_*" | while read line ; do
 			do
 				echo $line
 				errOutCount=$(($errOutCount + 1))
-			done
-			for alg in ${ALGS[@]}; do
-				for line in \
-					$($RUBY make_specs.rb \
-						"$line/$alg.comp.txt" "$line/case" \
-						2>&1 >/dev/null)
-				do
-					echo $line
-					errOutCount=$(($errOutCount + 1))
-				done
 			done
 			if [ $errOutCount -gt 0 ] ; then echo ; fi
 		)
