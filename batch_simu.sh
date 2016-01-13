@@ -26,7 +26,7 @@ find $1 -name "case_*" | while read line ; do
 		for ((ind=0; ind<5; ++ind)); do
 			par=${PARS[$ind]}
 			dnm=${DNMS[$ind]}
-			for ((jnd=11; jnd<=15; ++jnd)); do
+			for ((jnd=11; jnd<=12; ++jnd)); do
 				jnm="dynamic_$jnd.bandwidth"
 				echo -e "\033[1;37mRunning case: $jnm $par\033[0m"
 				echo

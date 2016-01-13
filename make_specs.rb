@@ -3,7 +3,7 @@
 require "fileutils"
 
 if ARGV.size != 2
-	STDERR.puts "Usage: ruby make_scenario.rb SPECS.comp.txt DIRECTORY"
+	STDERR.puts "Usage: ruby make_specs.rb SPECS.comp.txt DIRECTORY"
 	puts
 	exit
 end
