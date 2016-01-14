@@ -24,6 +24,8 @@ specsFileName = scenarioDirName + "/#{specsTitle}.specs"
 MY_NAME = "make_specs.rb"
 SCENARIO_NAME = "up"
 
+MDC_WAIT_BEFORE_START = 30
+
 # Check directory
 scenarioDirContents = nil
 begin
@@ -274,7 +276,8 @@ puts "Writing to file: " + specsFileName
 specsFile = File.open(specsFileName, "w")
 specsFile.puts tComp.size
 for j in 0...tComp.size
-	specsFile.puts "%d %d %.2f" % [j + 1, listAP[j][1] * 125 / 1024, tComp[j]]
+	specsFile.puts "%d %d %.2f" % \
+		[j + 1, listAP[j][1] * 125 / 1024, tComp[j] + MDC_WAIT_BEFORE_START]
 end
 specsFile.puts
 specsFile.close
