@@ -15,9 +15,9 @@ PWD_INIT=`pwd`
 PARS=("- OPPORTUNITY" \
 	"alg4.plan STRICT_PLAN" \
 	"ga.plan STRICT_PLAN" \
-	"alg4.plan ADAPTIVE_GP alg4.specs" \
-	"ga.plan ADAPTIVE_GP ga.specs")
-DNMS=("opportunity" "alg4_static" "ga_static" "alg4_agp" "ga_agp")
+	"alg4.plan CONTROL_TH alg4.specs" \
+	"ga.plan CONTROL_TH ga.specs")
+DNMS=("opportunity" "alg4_static" "ga_static" "alg4_ct" "ga_ct")
 find $1 -name "case_*" | while read line ; do
 	if [ -d "$line/case" ] ; then
 		cd "$line/case"
