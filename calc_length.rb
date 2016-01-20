@@ -268,7 +268,7 @@ for line in linesNoEmpty
 			timeComp[identAP - 1] = timeAP
 		else # Should be avoided by simulator
 			STDERR.puts "Duplicate access point received: #{identAP}"
-			timeComp[identAP - 1] = [timeComp[identAP - 1], timeAP].min
+			timeComp[identAP - 1] = [timeComp[identAP - 1], timeAP].max
 		end
 	end
 end
